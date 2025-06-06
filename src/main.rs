@@ -1,23 +1,23 @@
-use bevy::prelude::*;
+use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*};
 
+mod depth_post_process;
 mod overlay;
 mod selection;
 mod translation;
 
+use depth_post_process::{DepthPostProcessPlugin, DepthPostProcessSettings};
 use overlay::OverlayPlugin;
 use selection::{handle_selection, Selected, SelectionPlugin};
 use translation::{DragData, Translatable, TranslationPlugin};
 
 fn main() {
-    // Initialize console error hook when targeting wasm
-    #[cfg(target_arch = "wasm32")]
-    console_error_panic_hook::set_once();
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(MeshPickingPlugin)
         .add_plugins(SelectionPlugin)
         .add_plugins(OverlayPlugin)
         .add_plugins(TranslationPlugin)
+        .add_plugins(DepthPostProcessPlugin)
         .add_systems(Startup, setup_system)
         .add_systems(Update, highlight_selected_entities)
         .insert_resource(DragData::default())
@@ -31,14 +31,26 @@ fn setup_system(
     mut materials: ResMut<Assets<StandardMaterial>>, // Resource to store material data)
 ) {
     // Add a 3D camera positioned to view the sphere
-    // Add a camera
-    commands.spawn((
+    // Add a camera with conditional components
+    let camera_bundle = (
         Camera {
             order: 0,
             ..default()
         },
         Camera3d { ..default() },
         Transform::from_xyz(0., 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Msaa::Off,
+    );
+
+    commands.spawn((
+        camera_bundle,
+        DepthPostProcessSettings {
+            near_plane: 0.1,
+            far_plane: 100.0,
+            intensity: 1.0,
+            _padding: 0.0,
+        },
+        DepthPrepass,
     ));
 
     commands.spawn((

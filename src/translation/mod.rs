@@ -2,9 +2,7 @@ use crate::{
     overlay::{OverlayCamera, OVERLAY_LAYER},
     selection::{EntityDeselectedEvent, EntitySelectedEvent, Selected},
 };
-use bevy::{
-    ecs::relationship::RelationshipSourceCollection, prelude::*, render::view::RenderLayers,
-};
+use bevy::{prelude::*, render::view::RenderLayers};
 
 // Plugin for the translation system
 pub struct TranslationPlugin;
@@ -41,7 +39,6 @@ impl Default for DragData {
 #[derive(Resource)]
 pub struct DragHandlesResource {
     entity: Entity,
-    target: Entity,
 }
 
 #[derive(Component)]
@@ -51,7 +48,6 @@ impl Default for DragHandlesResource {
     fn default() -> Self {
         Self {
             entity: Entity::PLACEHOLDER,
-            target: Entity::PLACEHOLDER,
         }
     }
 }
@@ -62,7 +58,7 @@ pub enum TranslationAxis {
     X,
     Y,
     Z,
-    Free, // For free movement in the camera plane
+    // Free, // For free movement in the camera plane
 }
 
 fn on_add_translatable(trigger: Trigger<OnAdd, Translatable>, mut commands: Commands) {
@@ -86,7 +82,6 @@ pub fn on_select_translatable(
     mut meshes: ResMut<Assets<Mesh>>, // Resource to store mesh data
     mut materials: ResMut<Assets<StandardMaterial>>, // Resource to store material data)
     mut drag_handles_resource: ResMut<DragHandlesResource>,
-    mut gizmos: Gizmos,
 ) {
     let target = trigger.target();
 
@@ -266,13 +261,12 @@ fn on_drag_handle(
             let z_movement =
                 (ndc_delta.x * z_proj_right + ndc_delta.y * z_proj_up) * movement_scale;
             entity_transform.translation -= Vec3::Z * z_movement;
-        }
-        TranslationAxis::Free => {
-            // Move in the camera plane (perpendicular to view direction)
-            let world_delta =
-                right * ndc_delta.x * movement_scale + up * ndc_delta.y * movement_scale;
-            entity_transform.translation += world_delta;
-        }
+        } // TranslationAxis::Free => {
+          //     // Move in the camera plane (perpendicular to view direction)
+          //     let world_delta =
+          //         right * ndc_delta.x * movement_scale + up * ndc_delta.y * movement_scale;
+          //     entity_transform.translation += world_delta;
+          // }
     }
 }
 
