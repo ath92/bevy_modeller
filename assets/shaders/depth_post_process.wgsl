@@ -1,18 +1,15 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 
-@group(0) @binding(0) var screen_texture: texture_2d<f32>;
-@group(0) @binding(1) var screen_sampler: sampler;
-@group(0) @binding(2) var depth_texture: texture_depth_2d;
-@group(0) @binding(3) var depth_sampler: sampler;
+@group(0) @binding(0) var depth_texture: texture_depth_2d;
+@group(0) @binding(1) var depth_sampler: sampler;
 
 struct DepthPostProcessSettings {
     near_plane: f32,
     far_plane: f32,
     intensity: f32,
-    _padding: f32,
 }
 
-@group(0) @binding(4) var<uniform> settings: DepthPostProcessSettings;
+@group(0) @binding(2) var<uniform> settings: DepthPostProcessSettings;
 
 fn linearize_depth(depth: f32, near: f32, far: f32) -> f32 {
     let z = depth * 2.0 - 1.0; // Convert to NDC

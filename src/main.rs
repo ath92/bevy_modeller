@@ -48,7 +48,6 @@ fn setup_system(
             near_plane: 0.1,
             far_plane: 100.0,
             intensity: 1.0,
-            _padding: 0.0,
         },
         DepthPrepass,
     ));

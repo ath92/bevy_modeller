@@ -115,8 +115,6 @@ impl ViewNode for DepthPostProcessNode {
             "depth_post_process_bind_group",
             &pipeline.layout,
             &BindGroupEntries::sequential((
-                post_process.source,
-                &pipeline.sampler,
                 &depth_texture.texture.default_view,
                 &pipeline.depth_sampler,
                 settings_binding.clone(),
@@ -139,6 +137,7 @@ impl ViewNode for DepthPostProcessNode {
         render_pass.set_bind_group(0, &bind_group, &[settings_index.index()]);
         render_pass.draw(0..3, 0..1);
 
+        info!("got em");
         Ok(())
     }
 }
@@ -146,7 +145,6 @@ impl ViewNode for DepthPostProcessNode {
 #[derive(Resource)]
 struct DepthPostProcessPipeline {
     layout: BindGroupLayout,
-    sampler: Sampler,
     depth_sampler: Sampler,
     pipeline_id: CachedRenderPipelineId,
 }
@@ -160,10 +158,6 @@ impl FromWorld for DepthPostProcessPipeline {
             &BindGroupLayoutEntries::sequential(
                 ShaderStages::FRAGMENT,
                 (
-                    // Color texture
-                    texture_2d(TextureSampleType::Float { filterable: true }),
-                    // Color sampler
-                    sampler(SamplerBindingType::Filtering),
                     // Depth texture
                     texture_2d(TextureSampleType::Depth),
                     // Depth sampler
@@ -174,7 +168,6 @@ impl FromWorld for DepthPostProcessPipeline {
             ),
         );
 
-        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
         let depth_sampler = render_device.create_sampler(&SamplerDescriptor {
             mag_filter: FilterMode::Nearest,
             min_filter: FilterMode::Nearest,
@@ -209,7 +202,6 @@ impl FromWorld for DepthPostProcessPipeline {
 
         Self {
             layout,
-            sampler,
             depth_sampler,
             pipeline_id,
         }
@@ -221,5 +213,4 @@ pub struct DepthPostProcessSettings {
     pub near_plane: f32,
     pub far_plane: f32,
     pub intensity: f32,
-    pub _padding: f32,
 }
