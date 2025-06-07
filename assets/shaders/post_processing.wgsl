@@ -1,23 +1,3 @@
-// This shader computes the chromatic aberration effect
-
-// Since post processing is a fullscreen effect, we use the fullscreen vertex shader provided by bevy.
-// This will import a vertex shader that renders a single fullscreen triangle.
-//
-// A fullscreen triangle is a single triangle that covers the entire screen.
-// The box in the top left in that diagram is the screen. The 4 x are the corner of the screen
-//
-// Y axis
-//  1 |  x-----x......
-//  0 |  |  s  |  . ´
-// -1 |  x_____x´
-// -2 |  :  .´
-// -3 |  :´
-//    +---------------  X axis
-//      -1  0  1  2  3
-//
-// As you can see, the triangle ends up bigger than the screen.
-//
-// You don't need to worry about this too much since bevy will compute the correct UVs for you.
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
@@ -59,7 +39,6 @@ fn smooth_min(a: f32, b: f32, k: f32) -> f32 {
     return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-
 // Scene SDF - returns the minimum distance to any object using smooth blending
 fn scene_sdf(point: vec3<f32>) -> f32 {
     var result = 999999.0;
@@ -91,25 +70,25 @@ fn scene_sdf(point: vec3<f32>) -> f32 {
 fn get_ray_direction(uv: vec2<f32>) -> vec3<f32> {
     // Convert UV to NDC (Normalized Device Coordinates)
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
-    
+
     // Create points in NDC space (near and far plane)
     let near_point = vec4<f32>(ndc.x, ndc.y, -1.0, 1.0); // Near plane
     let far_point = vec4<f32>(ndc.x, ndc.y, 1.0, 1.0);   // Far plane
-    
+
     // Use precomputed inverse view-projection matrix
     let inv_view_proj = settings.inverse_view_projection;
-    
+
     // Transform points to world space
     let world_near = inv_view_proj * near_point;
     let world_far = inv_view_proj * far_point;
-    
+
     // Perspective divide
     let world_near_3d = world_near.xyz / world_near.w;
     let world_far_3d = world_far.xyz / world_far.w;
-    
+
     // Ray direction is from near to far point
     let ray_dir = normalize(world_far_3d - world_near_3d);
-    
+
     return ray_dir;
 }
 
