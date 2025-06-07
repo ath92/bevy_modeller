@@ -25,6 +25,7 @@ fn setup_system(mut commands: Commands) {
             RenderLayers::layer(OVERLAY_LAYER),
             Camera3d { ..default() },
             OverlayCamera,
+            Msaa::Off,
         ))
         .id();
 

@@ -4,6 +4,7 @@ use bevy::{
     core_pipeline::{
         core_3d::graph::{Core3d, Node3d},
         fullscreen_vertex_shader::fullscreen_shader_vertex_state,
+        prepass::ViewPrepassTextures,
     },
     ecs::query::QueryItem,
     prelude::*,
@@ -111,6 +112,8 @@ impl ViewNode for PostProcessNode {
     // This query will only run on the view entity
     type ViewQuery = (
         &'static ViewTarget,
+        // prepass textures
+        &'static ViewPrepassTextures,
         // This makes sure the node only runs on cameras with the PostProcessSettings component
         &'static PostProcessSettings,
         // As there could be multiple post processing components sent to the GPU (one per camera),
@@ -129,7 +132,9 @@ impl ViewNode for PostProcessNode {
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
-        (view_target, _post_process_settings, settings_index): QueryItem<Self::ViewQuery>,
+        (view_target, prepass_textures, _post_process_settings, settings_index): QueryItem<
+            Self::ViewQuery,
+        >,
         world: &World,
     ) -> Result<(), NodeRunError> {
         // Get the pipeline resource that contains the global data we need
@@ -144,13 +149,22 @@ impl ViewNode for PostProcessNode {
         // Get the pipeline from the cache
         let Some(pipeline) = pipeline_cache.get_render_pipeline(post_process_pipeline.pipeline_id)
         else {
-            info!("no pip");
+            let pipeline_state =
+                pipeline_cache.get_render_pipeline_state(post_process_pipeline.pipeline_id);
+
+            match pipeline_state {
+                CachedPipelineState::Err(err) => {
+                    info!("pipeline err {:?}", err);
+                }
+                _ => {}
+            }
             return Ok(());
         };
 
         // Get the settings uniform binding
         let settings_uniforms = world.resource::<ComponentUniforms<PostProcessSettings>>();
         let Some(settings_binding) = settings_uniforms.uniforms().binding() else {
+            info!("no settings binding");
             return Ok(());
         };
 
@@ -162,6 +176,11 @@ impl ViewNode for PostProcessNode {
         // texture to the `destination` texture. Failing to do so will cause
         // the current main texture information to be lost.
         let post_process = view_target.post_process_write();
+
+        let Some(depth_texture) = &prepass_textures.depth else {
+            info!("no depth");
+            return Ok(());
+        };
 
         // The bind_group gets created each frame.
         //
@@ -181,6 +200,10 @@ impl ViewNode for PostProcessNode {
                 &post_process_pipeline.sampler,
                 // Set the settings binding
                 settings_binding.clone(),
+                // Depth
+                &depth_texture.texture.default_view,
+                // Depth sampler
+                &post_process_pipeline.depth_sampler,
             )),
         );
 
@@ -217,6 +240,7 @@ impl ViewNode for PostProcessNode {
 struct PostProcessPipeline {
     layout: BindGroupLayout,
     sampler: Sampler,
+    depth_sampler: Sampler,
     pipeline_id: CachedRenderPipelineId,
 }
 
@@ -237,12 +261,17 @@ impl FromWorld for PostProcessPipeline {
                     sampler(SamplerBindingType::Filtering),
                     // The settings uniform that will control the effect
                     uniform_buffer::<PostProcessSettings>(true),
+                    // The depth texture
+                    texture_2d(TextureSampleType::Depth),
+                    // The depth sampler
+                    sampler(SamplerBindingType::NonFiltering),
                 ),
             ),
         );
 
         // We can create the sampler here since it won't change at runtime and doesn't depend on the view
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let depth_sampler = render_device.create_sampler(&SamplerDescriptor { ..default() });
 
         // Get the shader handle
         let shader = world.load_asset(SHADER_ASSET_PATH);
@@ -279,6 +308,7 @@ impl FromWorld for PostProcessPipeline {
         Self {
             layout,
             sampler,
+            depth_sampler,
             pipeline_id,
         }
     }
@@ -287,5 +317,6 @@ impl FromWorld for PostProcessPipeline {
 // This is the component that will get passed to the shader
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
 pub struct PostProcessSettings {
-    pub intensity: f32,
+    pub near_plane: f32,
+    pub far_plane: f32,
 }

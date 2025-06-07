@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*};
 
 mod overlay;
 mod post_process;
@@ -39,9 +39,12 @@ fn setup_system(
             ..default()
         },
         PostProcessSettings {
-            intensity: 0.02,
+            near_plane: 0.,
+            far_plane: 10.,
             ..default()
         },
+        DepthPrepass,
+        Msaa::Off,
         Camera3d { ..default() },
         Transform::from_xyz(0., 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));

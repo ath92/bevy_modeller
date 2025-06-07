@@ -23,24 +23,24 @@
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
 @group(0) @binding(1) var texture_sampler: sampler;
 struct PostProcessSettings {
-    intensity: f32,
-#ifdef SIXTEEN_BYTE_ALIGNMENT
-    // WebGL2 structs must be 16 byte aligned.
-    _webgl2_padding: vec3<f32>
-#endif
+    near_plane: f32,
+    far_plane: f32,
 }
 @group(0) @binding(2) var<uniform> settings: PostProcessSettings;
 
+@group(0) @binding(3) var depth_texture: texture_depth_2d;
+@group(0) @binding(4) var depth_sampler: sampler;
+
+
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
-    // Chromatic aberration strength
-    let offset_strength = settings.intensity;
+    // Sample the depth value
+    let depth = textureSample(depth_texture, depth_sampler, in.uv);
 
-    // Sample each color channel with an arbitrary shift
     return vec4<f32>(
-        textureSample(screen_texture, texture_sampler, in.uv + vec2<f32>(offset_strength, -offset_strength)).r,
-        textureSample(screen_texture, texture_sampler, in.uv + vec2<f32>(-offset_strength, 0.0)).g,
-        textureSample(screen_texture, texture_sampler, in.uv + vec2<f32>(0.0, offset_strength)).b,
+        depth,
+        depth,
+        depth,
         1.0
     );
 }
