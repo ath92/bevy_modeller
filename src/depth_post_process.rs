@@ -88,6 +88,14 @@ impl ViewNode for DepthPostProcessNode {
         let pipeline_cache = world.resource::<PipelineCache>();
 
         let Some(render_pipeline) = pipeline_cache.get_render_pipeline(pipeline.pipeline_id) else {
+            let pipeline_state = pipeline_cache.get_render_pipeline_state(pipeline.pipeline_id);
+
+            match pipeline_state {
+                CachedPipelineState::Err(err) => {
+                    info!("pipeline err {:?}", err);
+                }
+                _ => {}
+            }
             return Ok(());
         };
 
