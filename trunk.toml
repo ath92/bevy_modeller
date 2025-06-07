@@ -1,2 +1,2 @@
 [serve]
-no_spa=false
+no_spa = true

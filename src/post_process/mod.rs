@@ -90,8 +90,6 @@ impl Plugin for PostProcessPlugin {
             return;
         };
 
-        info!("adding resource");
-
         render_app
             // Initialize the pipeline
             .init_resource::<PostProcessPipeline>();
@@ -146,6 +144,7 @@ impl ViewNode for PostProcessNode {
         // Get the pipeline from the cache
         let Some(pipeline) = pipeline_cache.get_render_pipeline(post_process_pipeline.pipeline_id)
         else {
+            info!("no pip");
             return Ok(());
         };
 
