@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.16"
+bevy = { version = "0.16", features = ["webgpu"] }
 # Add getrandom with js feature to fix WebAssembly support
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
@@ -31,4 +31,3 @@ web-sys = { version = "0.3.74", features = [
 ]}
 # Optional but helpful for debugging in browser
 console_error_panic_hook = "0.1"
-

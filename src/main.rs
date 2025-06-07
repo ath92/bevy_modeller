@@ -1,19 +1,20 @@
 use bevy::prelude::*;
 
 mod overlay;
+mod post_process;
 mod selection;
 mod translation;
 
 use overlay::OverlayPlugin;
+use post_process::PostProcessPlugin;
 use selection::{handle_selection, Selected, SelectionPlugin};
 use translation::{DragData, Translatable, TranslationPlugin};
 
+use crate::post_process::PostProcessSettings;
+
 fn main() {
-    // Initialize console error hook when targeting wasm
-    #[cfg(target_arch = "wasm32")]
-    console_error_panic_hook::set_once();
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((DefaultPlugins, PostProcessPlugin))
         .add_plugins(MeshPickingPlugin)
         .add_plugins(SelectionPlugin)
         .add_plugins(OverlayPlugin)
@@ -35,6 +36,10 @@ fn setup_system(
     commands.spawn((
         Camera {
             order: 0,
+            ..default()
+        },
+        PostProcessSettings {
+            intensity: 0.02,
             ..default()
         },
         Camera3d { ..default() },

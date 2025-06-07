@@ -1,0 +1,403 @@
+    Blocking waiting for file lock on package cache
+warning: unused import: `std::default`
+ --> src/post_process/mod.rs:1:5
+  |
+1 | use std::default;
+  |     ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: use of deprecated method `bevy::prelude::Query::<'w, 's, D, F>::get_single`: Please use `single` instead
+  --> src/overlay/mod.rs:47:71
+   |
+47 |     if let Ok((main_gtransform, main_projection)) = main_camera_query.get_single() {
+   |                                                                       ^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `bevy::prelude::Query::<'w, 's, D, F>::get_single_mut`: Please use `single_mut` instead
+  --> src/overlay/mod.rs:49:34
+   |
+49 |             handles_camera_query.get_single_mut()
+   |                                  ^^^^^^^^^^^^^^
+
+warning: unused import: `ecs::relationship::RelationshipSourceCollection`
+ --> src/translation/mod.rs:6:5
+  |
+6 |     ecs::relationship::RelationshipSourceCollection, prelude::*, render::view::RenderLayers,
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `s`
+  --> src/overlay/mod.rs:52:18
+   |
+52 |             let (s, r, t) = main_gtransform.to_scale_rotation_translation();
+   |                  ^ help: if this is intentional, prefix it with an underscore: `_s`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `gizmos`
+  --> src/translation/mod.rs:89:9
+   |
+89 |     mut gizmos: Gizmos,
+   |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_gizmos`
+
+warning: variable does not need to be mutable
+  --> src/translation/mod.rs:89:5
+   |
+89 |     mut gizmos: Gizmos,
+   |     ----^^^^^^
+   |     |
+   |     help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: field `target` is never read
+  --> src/translation/mod.rs:44:5
+   |
+42 | pub struct DragHandlesResource {
+   |            ------------------- field in this struct
+43 |     entity: Entity,
+44 |     target: Entity,
+   |     ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: variant `Free` is never constructed
+  --> src/translation/mod.rs:65:5
+   |
+61 | pub enum TranslationAxis {
+   |          --------------- variant in this enum
+...
+65 |     Free, // For free movement in the camera plane
+   |     ^^^^
+   |
+   = note: `TranslationAxis` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: `bevy-web-app` (bin "bevy-web-app") generated 9 warnings (run `cargo fix --bin "bevy-web-app"` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running `target/debug/bevy-web-app`
+[2m2025-06-06T15:30:13.409510Z[0m [32m INFO[0m [2mbevy_diagnostic::system_information_diagnostics_plugin::internal[0m[2m:[0m SystemInfo { os: "macOS 15.4.1 Sequoia", kernel: "24.4.0", cpu: "Apple M4 Pro", core_count: "14", memory: "24.0 GiB" }    
+[2m2025-06-06T15:30:13.410909Z[0m [32m INFO[0m [2mbevy_app::terminal_ctrl_c_handler[0m[2m:[0m Skipping installing `Ctrl+C` handler as one was already installed. Please call `TerminalCtrlCHandlerPlugin::gracefully_exit` in your own `Ctrl+C` handler if you want Bevy to gracefully exit on `Ctrl+C`.    
+[2m2025-06-06T15:30:13.481020Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "Apple M4 Pro", vendor: 0, device: 0, device_type: IntegratedGpu, driver: "", driver_info: "", backend: Metal }
+[2m2025-06-06T15:30:13.586196Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2025-06-06T15:30:13.588500Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m adding resource
+[2m2025-06-06T15:30:13.637488Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window App (0v1)
+[2m2025-06-06T15:30:13.674833Z[0m [32m INFO[0m [2mbevy_web_app::translation[0m[2m:[0m added translatable
+[2m2025-06-06T15:30:13.674899Z[0m [32m INFO[0m [2mbevy_web_app::translation[0m[2m:[0m added translatable
+[2m2025-06-06T15:30:13.674930Z[0m [32m INFO[0m [2mbevy_web_app::translation[0m[2m:[0m added translatable
+[2m2025-06-06T15:30:13.932228Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.932260Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.942954Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.942984Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.947099Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.947128Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.955743Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.955774Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.962112Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.962136Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.977741Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.977765Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.986063Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.986091Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:13.994456Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:13.994479Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.002708Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.002738Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.010958Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.010984Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.019447Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.019471Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.027619Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.027647Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.035993Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.036018Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.044369Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.044401Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.053002Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.053031Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.061218Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.061252Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.069676Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.069702Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.077806Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.077835Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.086089Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.086114Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.094297Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.094325Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.102978Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.103011Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.111020Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.111051Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.119596Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.119634Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.127566Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.127590Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.136071Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.136100Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.144359Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.144392Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.152776Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.152803Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.161028Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.161054Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.169305Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.169332Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.177693Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.177719Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.186088Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.186116Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.194312Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.194341Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.202777Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.202812Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.211072Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.211094Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.219605Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.219635Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.227828Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.227859Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.236126Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.236153Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.244414Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.244441Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.253008Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.253037Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.261157Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.261183Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.269519Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.269546Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.277786Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.277810Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.286107Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.286133Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.294442Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.294467Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.302644Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.302665Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.311138Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.311166Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.319646Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.319682Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.327997Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.328021Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.336188Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.336212Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.344330Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.344355Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.352850Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.352876Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.360948Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.360975Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.369335Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.369361Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.377786Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.377820Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.387217Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.387246Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.394695Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.394720Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.402918Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.402945Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.412313Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.412344Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.420262Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.420299Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.428007Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.428031Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.436753Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.436788Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.444537Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.444573Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.452684Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.452710Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.461164Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.461186Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.469285Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.469311Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.477641Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.477664Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.485992Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.486012Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.494387Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.494421Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.502789Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.502818Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.511090Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.511116Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.519342Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.519367Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.537428Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.537456Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.552630Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.552678Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.557101Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.557147Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.561398Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.561434Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.570148Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.570192Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.577825Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.577856Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.586247Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.586275Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.594236Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.594257Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.602529Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.602555Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.610805Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.610831Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.619387Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.619419Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.627699Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.627729Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.635903Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.635926Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.644296Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.644322Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.653052Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.653080Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.661015Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.661042Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.669159Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.669187Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.677577Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.677608Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.686199Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.686227Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.694551Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.694575Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.702855Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.702881Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.711426Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.711450Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.719446Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.719477Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.727922Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.727952Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.736152Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.736180Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.744445Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.744475Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.753091Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.753121Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.760946Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.760972Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.769517Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.769549Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.777805Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.777832Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.786172Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.786195Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.794686Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.794716Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.802888Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.802913Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.811261Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.811283Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.819668Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.819694Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.827857Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.827880Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.836097Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.836123Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.844527Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.844551Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.852972Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.852996Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.861315Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.861345Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.869463Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.869490Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.878062Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.878086Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.886169Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.886192Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.894239Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.894275Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.902724Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.902750Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.911452Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.911483Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.919645Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.919675Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.927925Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.927954Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.936182Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.936205Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.944484Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.944514Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.952945Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.952974Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.961108Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.961135Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.969290Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.969317Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.977774Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.977802Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.986053Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.986077Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:14.994571Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:14.994594Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.002734Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.002761Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.010882Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.010901Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.019448Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.019476Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.027600Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.027629Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.036026Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.036050Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.044334Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.044364Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.052787Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.052811Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.061013Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.061034Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.069377Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.069414Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.077671Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.077699Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.086268Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.086292Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.094411Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.094443Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.103017Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.103047Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.111065Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.111101Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.119365Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.119389Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.127537Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.127564Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.135939Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.135962Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.144134Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.144156Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.152880Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.152906Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.161160Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.161189Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.169463Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.169495Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.177899Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.177926Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.186099Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.186125Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.194408Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.194431Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.202601Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.202627Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.210939Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.210966Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.219540Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.219565Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.227781Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.227810Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.236179Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.236202Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.244548Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.244574Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
+[2m2025-06-06T15:30:15.252661Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m pipeline id 7
+[2m2025-06-06T15:30:15.252686Z[0m [32m INFO[0m [2mbevy_web_app::post_process[0m[2m:[0m found cached pipeline ok RenderPipelineId(3)
