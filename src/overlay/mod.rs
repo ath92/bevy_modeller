@@ -45,12 +45,12 @@ fn sync_handles_camera_to_main(
     // Query the handles camera
     mut handles_camera_query: Query<(&mut Transform, &mut Projection), With<OverlayCamera>>,
 ) {
-    if let Ok((main_gtransform, main_projection)) = main_camera_query.get_single() {
+    if let Ok((main_gtransform, main_projection)) = main_camera_query.single() {
         if let Ok((mut handles_transform, mut handles_projection)) =
-            handles_camera_query.get_single_mut()
+            handles_camera_query.single_mut()
         {
             // Get scale, rotation, and translation from the main camera's global transform
-            let (s, r, t) = main_gtransform.to_scale_rotation_translation();
+            let (_s, r, t) = main_gtransform.to_scale_rotation_translation();
 
             // Apply to the handles camera's local transform
             // Handles camera should ideally be a child of the scene root or have its transform

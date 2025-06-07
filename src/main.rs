@@ -6,7 +6,7 @@ mod selection;
 mod translation;
 
 use overlay::OverlayPlugin;
-use post_process::PostProcessPlugin;
+use post_process::{PostProcessEntity, PostProcessPlugin};
 use selection::{handle_selection, Selected, SelectionPlugin};
 use translation::{DragData, Translatable, TranslationPlugin};
 
@@ -39,7 +39,7 @@ fn setup_system(
             ..default()
         },
         PostProcessSettings {
-            near_plane: 0.,
+            near_plane: 0.1,
             far_plane: 10.,
             ..default()
         },
@@ -64,6 +64,7 @@ fn setup_system(
     commands
         .spawn((
             Translatable,
+            PostProcessEntity,
             Transform::from_xyz(0.0, 0.0, 0.0),
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -85,6 +86,7 @@ fn setup_system(
             Transform::from_xyz(2.0, 0.0, 0.0),
             GlobalTransform::default(),
             Translatable,
+            PostProcessEntity,
         ))
         .observe(handle_selection);
 
@@ -99,6 +101,7 @@ fn setup_system(
             Transform::from_xyz(-2.0, 0.0, 0.0),
             GlobalTransform::default(),
             Translatable,
+            PostProcessEntity,
         ))
         .observe(handle_selection);
 }

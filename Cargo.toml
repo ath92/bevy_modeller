@@ -7,6 +7,8 @@ edition = "2021"
 bevy = { version = "0.16", features = ["webgpu"] }
 # Add getrandom with js feature to fix WebAssembly support
 getrandom = { version = "0.3", features = ["wasm_js"] }
+# For buffer data conversion
+bytemuck = { version = "1.14", features = ["derive"] }
 
 # Enable optimizations for dependencies (but not for our code):
 [profile.dev.package."*"]
