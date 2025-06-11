@@ -10,4 +10,4 @@ port = 8080
 
 [watch]
 # Watch additional directories
-ignore = ["dist/", "ui/src/", "ui/node_modules"]
+ignore = ["dist/", "ui/src/", "ui/node_modules", ".git"]

@@ -260,7 +260,7 @@ fn on_drag_handle(
             if t < 0. {
                 return;
             }
-            let intersection = ray.origin + ray.direction * t;
+            let intersection = ray.get_point(t);
 
             let x_movement = (intersection - start_pos).dot(Vec3::X);
 
@@ -273,9 +273,10 @@ fn on_drag_handle(
                 return;
             };
 
-            let Some(t) =
-                ray.intersect_plane(start_pos, InfinitePlane3d::new(ray.origin - start_pos))
-            else {
+            let Some(t) = ray.intersect_plane(
+                start_pos,
+                InfinitePlane3d::new((ray.origin - start_pos).with_y(0.)),
+            ) else {
                 return;
             };
 
@@ -296,7 +297,7 @@ fn on_drag_handle(
             if t < 0. {
                 return;
             }
-            let intersection = ray.origin + ray.direction * t;
+            let intersection = ray.get_point(t);
 
             let z_movement = (intersection - start_pos).dot(Vec3::Z);
 
