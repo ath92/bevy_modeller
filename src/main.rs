@@ -1,5 +1,6 @@
 use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, window::WindowResolution};
 
+use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use crossbeam_queue::SegQueue;
 use std::sync::LazyLock;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -40,6 +41,7 @@ fn main() {
             }),
             PostProcessPlugin,
         ))
+        .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(MeshPickingPlugin)
         .add_plugins(SelectionPlugin)
         .add_plugins(OverlayPlugin)
@@ -70,7 +72,7 @@ fn setup_system(
         },
         DepthPrepass,
         Msaa::Off,
-        Camera3d { ..default() },
+        PanOrbitCamera::default(),
         Transform::from_xyz(0., 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 

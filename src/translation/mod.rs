@@ -5,6 +5,7 @@ use crate::{
 use bevy::{
     ecs::relationship::RelationshipSourceCollection, prelude::*, render::view::RenderLayers,
 };
+use bevy_panorbit_camera::PanOrbitCamera;
 
 // Plugin for the translation system
 pub struct TranslationPlugin;
@@ -183,6 +184,7 @@ fn on_drag_start_handle(
     trigger: Trigger<Pointer<DragStart>>,
     drag_handles: Query<&DragHandle>,
     mut drag_data: ResMut<DragData>,
+    mut pan_orbit_query: Query<&mut PanOrbitCamera>,
 ) {
     let Some(hit_position) = trigger.event().hit.position else {
         return;
@@ -191,6 +193,10 @@ fn on_drag_start_handle(
     let Ok(handle) = drag_handles.get(trigger.target()) else {
         return;
     };
+
+    for mut pan_orbit in pan_orbit_query.iter_mut() {
+        pan_orbit.enabled = false;
+    }
 
     info!("dragstart");
 
@@ -276,6 +282,14 @@ fn on_drag_handle(
     }
 }
 
-fn on_drag_end_handle(_: Trigger<Pointer<DragEnd>>, mut drag_data: ResMut<DragData>) {
+fn on_drag_end_handle(
+    _: Trigger<Pointer<DragEnd>>,
+    mut drag_data: ResMut<DragData>,
+    mut pan_orbit_query: Query<&mut PanOrbitCamera>,
+) {
     *drag_data = DragData::Idle;
+
+    for mut pan_orbit in pan_orbit_query.iter_mut() {
+        pan_orbit.enabled = true;
+    }
 }

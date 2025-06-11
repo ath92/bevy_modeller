@@ -21,6 +21,7 @@ web-sys = { version = "0.3.74", features = [
     "Node",
     "console",
 ] }
+bevy_panorbit_camera = "0.26.0"
 
 # Enable optimizations for dependencies (but not for our code):
 [profile.dev.package."*"]
