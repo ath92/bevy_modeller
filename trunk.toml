@@ -1,2 +1,13 @@
+[build]
+# Output directory for WASM build
+dist = "dist"
+# Copy assets to output directory
+filehash = false
+
 [serve]
 no_spa = true
+port = 8080
+
+[watch]
+# Watch additional directories
+ignore = ["dist/", "ui/src/", "ui/node_modules"]

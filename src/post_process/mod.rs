@@ -83,7 +83,14 @@ impl Plugin for PostProcessPlugin {
             ExtractResourcePlugin::<EntityTransformData>::default(),
         ))
         // Add the system to collect transform data
-        .add_systems(Update, (collect_entity_transforms, update_camera_settings));
+        .add_systems(
+            Update,
+            (
+                collect_entity_transforms,
+                update_camera_settings,
+                update_entity_count_in_settings,
+            ),
+        );
 
         // We need to get the render app from the main app
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
@@ -94,7 +101,12 @@ impl Plugin for PostProcessPlugin {
             .init_resource::<EntityTransformBuffer>()
             .add_systems(
                 Render,
-                update_transform_buffer.in_set(RenderSet::PrepareResources),
+                (
+                    update_transform_buffer.in_set(RenderSet::PrepareResources),
+                    update_render_world_entity_count
+                        .in_set(RenderSet::PrepareResources)
+                        .after(update_transform_buffer),
+                ),
             )
             // Bevy's renderer uses a render graph which is a collection of nodes in a directed acyclic graph.
             // It currently runs on each view/camera and executes each node in the specified order.
@@ -186,6 +198,37 @@ fn update_transform_buffer(
             let data_bytes = bytemuck::cast_slice(&transform_buffer.data);
             render_queue.write_buffer(buffer, 0, data_bytes);
         }
+    }
+}
+
+// System to update entity count in main world settings
+fn update_entity_count_in_settings(
+    mut settings_query: Query<&mut PostProcessSettings>,
+    transform_data: Option<Res<EntityTransformData>>,
+) {
+    for mut settings in settings_query.iter_mut() {
+        let entity_count = transform_data
+            .as_ref()
+            .map(|data| data.0.len())
+            .unwrap_or(0) as u32;
+
+        settings.entity_count = entity_count;
+    }
+}
+
+// System to update entity count in render world settings
+fn update_render_world_entity_count(
+    mut settings_query: Query<&mut PostProcessSettings>,
+    transform_buffer: Option<Res<EntityTransformBuffer>>,
+) {
+    for mut settings in settings_query.iter_mut() {
+        let entity_count = transform_buffer
+            .as_ref()
+            .map(|buffer| buffer.data.len())
+            .unwrap_or(0) as u32;
+
+        // info!("Updating entity count in render world: {} -> {}", settings.entity_count, entity_count);
+        settings.entity_count = entity_count;
     }
 }
 
@@ -440,7 +483,7 @@ pub struct PostProcessSettings {
     pub view_matrix: Mat4,
     pub projection_matrix: Mat4,
     pub camera_position: Vec3,
-    pub _padding: f32,
+    pub entity_count: u32,
     pub inverse_view_projection: Mat4,
 }
 
@@ -454,10 +497,10 @@ fn update_camera_settings(
     for (mut settings, global_transform, projection) in camera_query.iter_mut() {
         // Update camera position
         settings.camera_position = global_transform.translation();
-        
+
         // Update view matrix (inverse of camera's global transform)
         settings.view_matrix = global_transform.compute_matrix().inverse();
-        
+
         // Update projection matrix
         match projection {
             Projection::Perspective(perspective) => {
@@ -465,7 +508,7 @@ fn update_camera_settings(
                 let fov = perspective.fov;
                 let near = perspective.near;
                 let far = perspective.far;
-                
+
                 let f = 1.0 / (fov * 0.5).tan();
                 settings.projection_matrix = Mat4::from_cols(
                     Vec4::new(f / aspect, 0.0, 0.0, 0.0),
@@ -481,12 +524,17 @@ fn update_camera_settings(
                 let top = orthographic.area.max.y;
                 let near = orthographic.near;
                 let far = orthographic.far;
-                
+
                 settings.projection_matrix = Mat4::from_cols(
                     Vec4::new(2.0 / (right - left), 0.0, 0.0, 0.0),
                     Vec4::new(0.0, 2.0 / (top - bottom), 0.0, 0.0),
                     Vec4::new(0.0, 0.0, -2.0 / (far - near), 0.0),
-                    Vec4::new(-(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1.0),
+                    Vec4::new(
+                        -(right + left) / (right - left),
+                        -(top + bottom) / (top - bottom),
+                        -(far + near) / (far - near),
+                        1.0,
+                    ),
                 );
             }
             _ => {
@@ -494,11 +542,9 @@ fn update_camera_settings(
                 settings.projection_matrix = Mat4::IDENTITY;
             }
         }
-        
+
         // Compute and store the inverse view-projection matrix on CPU
         let view_proj = settings.projection_matrix * settings.view_matrix;
         settings.inverse_view_projection = view_proj.inverse();
     }
 }
-
-

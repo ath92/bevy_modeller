@@ -1,4 +1,8 @@
-use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*};
+use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, window::WindowResolution};
+
+use crossbeam_queue::SegQueue;
+use std::sync::LazyLock;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 mod overlay;
 mod post_process;
@@ -7,20 +11,41 @@ mod translation;
 
 use overlay::OverlayPlugin;
 use post_process::{PostProcessEntity, PostProcessPlugin};
-use selection::{handle_selection, Selected, SelectionPlugin};
+use selection::{handle_selection, SelectionPlugin};
 use translation::{DragData, Translatable, TranslationPlugin};
 
 use crate::post_process::PostProcessSettings;
 
+// Command for spawning spheres from JavaScript
+#[derive(Debug, Clone)]
+struct SpawnSphereCommand {
+    position: Vec3,
+    color: Color,
+}
+
+// Global thread-safe queue for sphere spawn commands
+static SPAWN_QUEUE: LazyLock<SegQueue<SpawnSphereCommand>> = LazyLock::new(|| SegQueue::new());
+
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, PostProcessPlugin))
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: WindowResolution::new(1.0, 1.0).with_scale_factor_override(1.0),
+                    fit_canvas_to_parent: true,
+                    prevent_default_event_handling: false,
+                    ..default()
+                }),
+                ..default()
+            }),
+            PostProcessPlugin,
+        ))
         .add_plugins(MeshPickingPlugin)
         .add_plugins(SelectionPlugin)
         .add_plugins(OverlayPlugin)
         .add_plugins(TranslationPlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, highlight_selected_entities)
+        .add_systems(Update, (process_spawn_commands))
         .insert_resource(DragData::default())
         .run();
 }
@@ -66,7 +91,10 @@ fn setup_system(
             Translatable,
             PostProcessEntity,
             Transform::from_xyz(0.0, 0.0, 0.0),
-            Mesh3d(meshes.add(Sphere::default())),
+            Mesh3d(meshes.add(Sphere {
+                radius: 1.,
+                ..default()
+            })),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::srgb(0.9, 0.2, 0.2),
                 ..default()
@@ -75,10 +103,13 @@ fn setup_system(
         ))
         .observe(handle_selection);
 
-    // Spawn a blue cube
+    // Spawn a blue sphere
     commands
         .spawn((
-            Mesh3d(meshes.add(Cuboid::default())),
+            Mesh3d(meshes.add(Sphere {
+                radius: 1.,
+                ..default()
+            })),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::srgb(0.2, 0.2, 0.9),
                 ..default()
@@ -90,10 +121,13 @@ fn setup_system(
         ))
         .observe(handle_selection);
 
-    // Spawn a green cylinder
+    // Spawn a green sphere
     commands
         .spawn((
-            Mesh3d(meshes.add(Cylinder::default())),
+            Mesh3d(meshes.add(Sphere {
+                radius: 1.,
+                ..default()
+            })),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::srgb(0.2, 0.9, 0.2),
                 ..default()
@@ -106,21 +140,49 @@ fn setup_system(
         .observe(handle_selection);
 }
 
-// System to highlight selected entities with a visual indicator
-fn highlight_selected_entities(
-    selected_query: Query<(Entity, &GlobalTransform), With<Selected>>,
-    mut gizmos: Gizmos,
+// System to process sphere spawn commands from the queue
+fn process_spawn_commands(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    for (_, transform) in selected_query.iter() {
-        let position = transform.translation();
-
-        // Draw a highlight box around the selected entity
-        let size = Vec3::splat(1.2); // Slightly larger than the mesh
-
-        // Draw box outline
-        gizmos.cuboid(
-            Transform::from_translation(position).with_scale(size),
-            Color::srgb(0.9, 0.9, 0.1), // Yellow highlight
-        );
+    while let Some(cmd) = SPAWN_QUEUE.pop() {
+        commands
+            .spawn((
+                Translatable,
+                PostProcessEntity,
+                Transform::from_translation(cmd.position),
+                Mesh3d(meshes.add(Sphere {
+                    radius: 1.0,
+                    ..default()
+                })),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: cmd.color,
+                    ..default()
+                })),
+                GlobalTransform::default(),
+            ))
+            .observe(handle_selection);
     }
+}
+
+// WASM-bindgen function to spawn a sphere from JavaScript
+#[wasm_bindgen]
+pub fn spawn_sphere(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> String {
+    let command = SpawnSphereCommand {
+        position: Vec3::new(x, y, z),
+        color: Color::srgb(r, g, b),
+    };
+
+    SPAWN_QUEUE.push(command);
+    format!(
+        "Queued sphere spawn at ({}, {}, {}) with color ({}, {}, {})",
+        x, y, z, r, g, b
+    )
+}
+
+// Convenience function to spawn a sphere at origin
+#[wasm_bindgen]
+pub fn spawn_sphere_at_origin() -> String {
+    spawn_sphere(0.0, 0.0, 0.0, 0.5, 0.5, 0.9)
 }

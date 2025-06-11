@@ -8,7 +8,7 @@ struct PostProcessSettings {
     view_matrix: mat4x4<f32>,
     projection_matrix: mat4x4<f32>,
     camera_position: vec3<f32>,
-    _padding: f32,
+    entity_count: u32,
     inverse_view_projection: mat4x4<f32>,
 }
 @group(0) @binding(2) var<uniform> settings: PostProcessSettings;
@@ -42,7 +42,7 @@ fn smooth_min(a: f32, b: f32, k: f32) -> f32 {
 // Scene SDF - returns the minimum distance to any object using smooth blending
 fn scene_sdf(point: vec3<f32>) -> f32 {
     var result = 999999.0;
-    let transform_count = arrayLength(&entity_transforms);
+    let transform_count = settings.entity_count;
     let smoothing_factor = 0.5; // Adjust for more/less blending
 
     for (var i = 0u; i < transform_count; i++) {

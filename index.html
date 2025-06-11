@@ -6,24 +6,34 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Bevy WebGPU App</title>
         <style>
-            body {
+            * {
                 margin: 0;
                 padding: 0;
-                background-color: #333;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                width: 100vw;
-                height: 100vh;
-                overflow: hidden;
+                box-sizing: border-box;
             }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                background-color: #000;
+            }
+
             canvas {
-                background-color: #222;
-                max-width: 100%;
-                max-height: 100%;
+                display: block;
+                width: 100%;
+                height: 100%;
+                position: fixed;
+                top: 0;
+                outline: none;
             }
         </style>
         <link rel="copy-dir" href="assets" data-trunk />
+        <link rel="copy-dir" href="ui" data-trunk />
     </head>
-    <body></body>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="ui/dist/index.js"></script>
+    </body>
 </html>

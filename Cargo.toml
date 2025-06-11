@@ -9,17 +9,7 @@ bevy = { version = "0.16", features = ["webgpu"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 # For buffer data conversion
 bytemuck = { version = "1.14", features = ["derive"] }
-
-# Enable optimizations for dependencies (but not for our code):
-[profile.dev.package."*"]
-opt-level = 3
-
-# Enable high optimizations for release builds
-[profile.release]
-opt-level = 3
-
-# Web-specific dependencies
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+crossbeam-queue = "0.3"
 wasm-bindgen = "0.2.97"
 wasm-bindgen-futures = "0.4.45"
 web-sys = { version = "0.3.74", features = [
@@ -30,6 +20,17 @@ web-sys = { version = "0.3.74", features = [
     "HtmlBodyElement",
     "Node",
     "console",
-]}
+] }
+
+# Enable optimizations for dependencies (but not for our code):
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable high optimizations for release builds
+[profile.release]
+opt-level = 3
+
 # Optional but helpful for debugging in browser
 console_error_panic_hook = "0.1"
+# Thread-safe queue for WASM commands
+crossbeam-queue = "0.3"
