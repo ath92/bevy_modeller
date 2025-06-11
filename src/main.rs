@@ -47,7 +47,7 @@ fn main() {
         .add_plugins(OverlayPlugin)
         .add_plugins(TranslationPlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, (process_spawn_commands))
+        .add_systems(Update, process_spawn_commands)
         .insert_resource(DragData::default())
         .run();
 }
@@ -168,7 +168,6 @@ fn process_spawn_commands(
     }
 }
 
-// WASM-bindgen function to spawn a sphere from JavaScript
 #[wasm_bindgen]
 pub fn spawn_sphere(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> String {
     let command = SpawnSphereCommand {
@@ -183,7 +182,6 @@ pub fn spawn_sphere(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> String {
     )
 }
 
-// Convenience function to spawn a sphere at origin
 #[wasm_bindgen]
 pub fn spawn_sphere_at_origin() -> String {
     spawn_sphere(0.0, 0.0, 0.0, 0.5, 0.5, 0.9)
