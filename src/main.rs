@@ -2,7 +2,9 @@ use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, window::WindowResol
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use crossbeam_queue::SegQueue;
+use std::env;
 use std::sync::LazyLock;
+use std::time::Duration;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 mod overlay;
@@ -17,15 +19,30 @@ use translation::{DragData, Translatable, TranslationPlugin};
 
 use crate::post_process::PostProcessSettings;
 
-// Command for spawning spheres from JavaScript
-#[derive(Debug, Clone)]
-struct SpawnSphereCommand {
-    position: Vec3,
-    color: Color,
+enum JSCommand {
+    SpawnSphereCommand { position: Vec3, color: Color },
 }
 
-// Global thread-safe queue for sphere spawn commands
-static SPAWN_QUEUE: LazyLock<SegQueue<SpawnSphereCommand>> = LazyLock::new(|| SegQueue::new());
+// Global thread-safe queue for JS commands
+static SPAWN_QUEUE: LazyLock<SegQueue<JSCommand>> = LazyLock::new(|| SegQueue::new());
+
+#[derive(Resource)]
+struct AutoCloseTimer {
+    timer: Timer,
+    enabled: bool,
+}
+
+impl AutoCloseTimer {
+    fn new() -> Self {
+        let args: Vec<String> = env::args().collect();
+        let auto_close = args.iter().any(|arg| arg == "--auto-close");
+
+        Self {
+            timer: Timer::new(Duration::from_secs(3), TimerMode::Once),
+            enabled: auto_close,
+        }
+    }
+}
 
 fn main() {
     App::new()
@@ -47,8 +64,9 @@ fn main() {
         .add_plugins(OverlayPlugin)
         .add_plugins(TranslationPlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, process_spawn_commands)
+        .add_systems(Update, (process_js_commands, auto_close_system))
         .insert_resource(DragData::default())
+        .insert_resource(AutoCloseTimer::new())
         .run();
 }
 
@@ -103,7 +121,8 @@ fn setup_system(
             })),
             GlobalTransform::default(),
         ))
-        .observe(handle_selection);
+        .observe(handle_selection)
+        .observe(drag_paint);
 
     // Spawn a blue sphere
     commands
@@ -121,7 +140,8 @@ fn setup_system(
             Translatable,
             PostProcessEntity,
         ))
-        .observe(handle_selection);
+        .observe(handle_selection)
+        .observe(drag_paint);
 
     // Spawn a green sphere
     commands
@@ -139,50 +159,69 @@ fn setup_system(
             Translatable,
             PostProcessEntity,
         ))
-        .observe(handle_selection);
+        .observe(handle_selection)
+        .observe(drag_paint);
 }
 
 // System to process sphere spawn commands from the queue
-fn process_spawn_commands(
+fn process_js_commands(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    camera: Query<(&Camera, &GlobalTransform)>,
 ) {
     while let Some(cmd) = SPAWN_QUEUE.pop() {
-        commands
-            .spawn((
-                Translatable,
-                PostProcessEntity,
-                Transform::from_translation(cmd.position),
-                Mesh3d(meshes.add(Sphere {
-                    radius: 1.0,
-                    ..default()
-                })),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: cmd.color,
-                    ..default()
-                })),
-                GlobalTransform::default(),
-            ))
-            .observe(handle_selection);
+        match cmd {
+            JSCommand::SpawnSphereCommand { position, color } => {
+                commands
+                    .spawn((
+                        Translatable,
+                        PostProcessEntity,
+                        Transform::from_translation(position),
+                        Mesh3d(meshes.add(Sphere {
+                            radius: 1.0,
+                            ..default()
+                        })),
+                        MeshMaterial3d(materials.add(StandardMaterial {
+                            base_color: color,
+                            ..default()
+                        })),
+                        GlobalTransform::default(),
+                    ))
+                    .observe(handle_selection);
+            }
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn spawn_sphere(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> String {
-    let command = SpawnSphereCommand {
-        position: Vec3::new(x, y, z),
-        color: Color::srgb(r, g, b),
-    };
-
-    SPAWN_QUEUE.push(command);
-    format!(
-        "Queued sphere spawn at ({}, {}, {}) with color ({}, {}, {})",
-        x, y, z, r, g, b
-    )
+pub fn spawn_sphere_at_origin() {
+    SPAWN_QUEUE.push(JSCommand::SpawnSphereCommand {
+        position: Vec3::new(0., 0., 0.),
+        color: Color::Srgba(Srgba::WHITE),
+    });
 }
 
-#[wasm_bindgen]
-pub fn spawn_sphere_at_origin() -> String {
-    spawn_sphere(0.0, 0.0, 0.0, 0.5, 0.5, 0.9)
+fn auto_close_system(
+    time: Res<Time>,
+    mut timer: ResMut<AutoCloseTimer>,
+    mut exit: EventWriter<AppExit>,
+) {
+    if timer.enabled {
+        timer.timer.tick(time.delta());
+        if timer.timer.finished() {
+            info!("Auto-closing application after 15 seconds");
+            exit.write(AppExit::Success);
+        }
+    }
+}
+
+fn drag_paint(trigger: Trigger<Pointer<Drag>>, camera: Query<(&Camera, &GlobalTransform)>) {
+    // do something on drag
+    let target = trigger.target();
+    let viewport_position = trigger.pointer_location.position;
+    let Ok((cam, camera_transform)) = camera.single() else {
+        return;
+    };
+    let ray = cam.viewport_to_world(camera_transform, viewport_position);
 }

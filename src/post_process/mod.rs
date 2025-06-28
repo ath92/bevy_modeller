@@ -233,7 +233,7 @@ fn update_render_world_entity_count(
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-struct PostProcessLabel;
+pub struct PostProcessLabel;
 
 // The post process node used for the render graph
 #[derive(Default)]
@@ -352,6 +352,16 @@ impl ViewNode for PostProcessNode {
                 &depth_texture.texture.default_view,
                 // Depth sampler
                 &post_process_pipeline.depth_sampler,
+            )),
+        );
+
+        // Create SDF scene bind group (group 1)
+        let sdf_bind_group = render_context.render_device().create_bind_group(
+            "sdf_scene_bind_group",
+            &post_process_pipeline.sdf_layout,
+            &BindGroupEntries::sequential((
+                // SDF settings uniform (same as main settings)
+                settings_binding.clone(),
                 // Transform storage buffer
                 transform_binding,
             )),
@@ -379,6 +389,7 @@ impl ViewNode for PostProcessNode {
         // that in the event that multiple settings were sent to the GPU (as would be the
         // case with multiple cameras), we use the correct one.
         render_pass.set_bind_group(0, &bind_group, &[settings_index.index()]);
+        render_pass.set_bind_group(1, &sdf_bind_group, &[settings_index.index()]);
         render_pass.draw(0..3, 0..1);
 
         Ok(())
@@ -389,6 +400,7 @@ impl ViewNode for PostProcessNode {
 #[derive(Resource)]
 struct PostProcessPipeline {
     layout: BindGroupLayout,
+    sdf_layout: BindGroupLayout,
     sampler: Sampler,
     depth_sampler: Sampler,
     pipeline_id: CachedRenderPipelineId,
@@ -415,9 +427,21 @@ impl FromWorld for PostProcessPipeline {
                     texture_2d(TextureSampleType::Depth),
                     // The depth sampler
                     sampler(SamplerBindingType::NonFiltering),
+                ),
+            ),
+        );
+
+        // Separate bind group layout for SDF scene data (group 1)
+        let sdf_layout = render_device.create_bind_group_layout(
+            "sdf_scene_bind_group_layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    // SDF settings uniform
+                    uniform_buffer::<PostProcessSettings>(true),
                     // Storage buffer for entity transforms
                     BindGroupLayoutEntry {
-                        binding: 5,
+                        binding: 1,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Storage { read_only: true },
@@ -442,7 +466,7 @@ impl FromWorld for PostProcessPipeline {
             // This will add the pipeline to the cache and queue its creation
             .queue_render_pipeline(RenderPipelineDescriptor {
                 label: Some("post_process_pipeline".into()),
-                layout: vec![layout.clone()],
+                layout: vec![layout.clone(), sdf_layout.clone()],
                 // This will setup a fullscreen triangle for the vertex state
                 vertex: fullscreen_shader_vertex_state(),
                 fragment: Some(FragmentState {
@@ -468,6 +492,7 @@ impl FromWorld for PostProcessPipeline {
 
         Self {
             layout,
+            sdf_layout,
             sampler,
             depth_sampler,
             pipeline_id,

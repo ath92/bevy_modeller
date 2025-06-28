@@ -234,18 +234,6 @@ fn on_drag_handle(
         return;
     };
 
-    let ndc_delta = trigger.event().delta;
-
-    // Scale factor - adjust as needed for movement sensitivity
-    let drag_sensitivity = 0.001;
-
-    // Get camera basis vectors
-    let right = camera_transform.right();
-    let up = camera_transform.up();
-
-    // Calculate distance from camera to object for scaling
-    let camera_to_object = (start_pos - camera_transform.translation()).length();
-    let movement_scale = camera_to_object * drag_sensitivity;
     info!("dragging");
 
     match active_axis {
@@ -255,8 +243,8 @@ fn on_drag_handle(
             else {
                 return;
             };
-            let diff = start_pos - ray.origin;
-            let t = diff.y / ray.direction.y;
+            let diff = start_pos.y - ray.origin.y;
+            let t = diff / ray.direction.y;
             if t < 0. {
                 return;
             }
@@ -292,8 +280,8 @@ fn on_drag_handle(
             else {
                 return;
             };
-            let diff = start_pos - ray.origin;
-            let t = diff.y / ray.direction.y;
+            let diff = start_pos.y - ray.origin.y;
+            let t = diff / ray.direction.y;
             if t < 0. {
                 return;
             }
