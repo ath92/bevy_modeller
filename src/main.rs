@@ -9,18 +9,21 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 mod overlay;
 mod post_process;
+mod sdf_compute;
 mod selection;
 mod translation;
 
 use overlay::OverlayPlugin;
-use post_process::{PostProcessEntity, PostProcessPlugin};
+use post_process::{PostProcessEntity, PostProcessPlugin, PostProcessSettings};
+use sdf_compute::{
+    evaluate_sdf_async, GpuVec3, SdfComputePlugin, SdfEvaluationReceiver, SdfEvaluationSender,
+};
 use selection::{handle_selection, SelectionPlugin};
 use translation::{DragData, Translatable, TranslationPlugin};
 
-use crate::post_process::PostProcessSettings;
-
 enum JSCommand {
     SpawnSphereCommand { position: Vec3, color: Color },
+    EvaluateSdfCommand { points: Vec<Vec3> },
 }
 
 // Global thread-safe queue for JS commands
@@ -63,8 +66,16 @@ fn main() {
         .add_plugins(SelectionPlugin)
         .add_plugins(OverlayPlugin)
         .add_plugins(TranslationPlugin)
+        .add_plugins(SdfComputePlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, (process_js_commands, auto_close_system))
+        .add_systems(
+            Update,
+            (
+                process_js_commands,
+                process_sdf_responses,
+                auto_close_system,
+            ),
+        )
         .insert_resource(DragData::default())
         .insert_resource(AutoCloseTimer::new())
         .run();
@@ -169,6 +180,8 @@ fn process_js_commands(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     camera: Query<(&Camera, &GlobalTransform)>,
+    sdf_sender: Res<SdfEvaluationSender>,
+    sdf_receiver: Res<SdfEvaluationReceiver>,
 ) {
     while let Some(cmd) = SPAWN_QUEUE.pop() {
         match cmd {
@@ -190,6 +203,21 @@ fn process_js_commands(
                     ))
                     .observe(handle_selection);
             }
+            JSCommand::EvaluateSdfCommand { points } => {
+                let mut gpu_points: Vec<GpuVec3> = Vec::new();
+                for p in points {
+                    gpu_points.push(GpuVec3 {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z,
+                        _padding: 0.,
+                    });
+                }
+                info!("Starting SDF evaluation for {} points", gpu_points.len());
+                let _future = evaluate_sdf_async(gpu_points, &sdf_sender, &sdf_receiver);
+                // The future will complete asynchronously and results will be processed
+                // by the process_sdf_responses system
+            }
         }
     }
 }
@@ -200,6 +228,36 @@ pub fn spawn_sphere_at_origin() {
         position: Vec3::new(0., 0., 0.),
         color: Color::Srgba(Srgba::WHITE),
     });
+}
+
+#[wasm_bindgen]
+pub fn test_sdf_evaluation() {
+    // Test SDF evaluation at a few interesting points
+    let test_points = vec![
+        Vec3::new(0.0, 0.0, 0.0),  // Center (should be inside red sphere)
+        Vec3::new(1.0, 0.0, 0.0),  // Edge of red sphere
+        Vec3::new(2.0, 0.0, 0.0),  // Center of blue sphere
+        Vec3::new(-2.0, 0.0, 0.0), // Center of green sphere
+        Vec3::new(0.0, 2.0, 0.0),  // Above spheres
+        Vec3::new(5.0, 0.0, 0.0),  // Far away
+    ];
+
+    SPAWN_QUEUE.push(JSCommand::EvaluateSdfCommand {
+        points: test_points,
+    });
+}
+
+// System to process SDF evaluation responses and print results
+fn process_sdf_responses(sdf_receiver: Res<SdfEvaluationReceiver>) {
+    while let Some(response) = sdf_receiver.0.try_recv() {
+        info!("SDF Evaluation Results (ID: {}):", response.id);
+        for (i, result) in response.results.iter().enumerate() {
+            info!(
+                "  Point {}: distance = {:.3}, material_id = {}",
+                i, result.distance, result.material_id
+            );
+        }
+    }
 }
 
 fn auto_close_system(

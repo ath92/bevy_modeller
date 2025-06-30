@@ -346,8 +346,6 @@ impl ViewNode for PostProcessNode {
                 post_process.source,
                 // Use the sampler created for the pipeline
                 &post_process_pipeline.sampler,
-                // Set the settings binding
-                settings_binding.clone(),
                 // Depth
                 &depth_texture.texture.default_view,
                 // Depth sampler
@@ -388,7 +386,7 @@ impl ViewNode for PostProcessNode {
         // By passing in the index of the post process settings on this view, we ensure
         // that in the event that multiple settings were sent to the GPU (as would be the
         // case with multiple cameras), we use the correct one.
-        render_pass.set_bind_group(0, &bind_group, &[settings_index.index()]);
+        render_pass.set_bind_group(0, &bind_group, &[]);
         render_pass.set_bind_group(1, &sdf_bind_group, &[settings_index.index()]);
         render_pass.draw(0..3, 0..1);
 
@@ -421,8 +419,6 @@ impl FromWorld for PostProcessPipeline {
                     texture_2d(TextureSampleType::Float { filterable: true }),
                     // The sampler that will be used to sample the screen texture
                     sampler(SamplerBindingType::Filtering),
-                    // The settings uniform that will control the effect
-                    uniform_buffer::<PostProcessSettings>(true),
                     // The depth texture
                     texture_2d(TextureSampleType::Depth),
                     // The depth sampler

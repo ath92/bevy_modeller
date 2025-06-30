@@ -1,4 +1,4 @@
-#import "shaders/sdf_common.wgsl"::*
+#import "shaders/sdf_common.wgsl"::{SceneSdfResult, evaluate_scene_sdf}
 
 // Input buffer for query points
 @group(0) @binding(0) var<storage, read> query_points: array<vec3<f32>>;

@@ -34,4 +34,3 @@ opt-level = 3
 
 # Optional but helpful for debugging in browser
 console_error_panic_hook = "0.1"
-
