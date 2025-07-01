@@ -1,6 +1,7 @@
 use crate::{
     overlay::{OverlayCamera, OVERLAY_LAYER},
     selection::{EntityDeselectedEvent, EntitySelectedEvent, Selected},
+    AppMode, AppModeState,
 };
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_panorbit_camera::PanOrbitCamera;
@@ -13,6 +14,7 @@ impl Plugin for TranslationPlugin {
         app.init_resource::<DragData>()
             .init_resource::<DragData>()
             .init_resource::<DragHandlesResource>()
+            .add_systems(Update, on_change_app_mode)
             .add_observer(on_add_translatable);
     }
 }
@@ -79,13 +81,34 @@ fn on_add_translatable(trigger: Trigger<OnAdd, Translatable>, mut commands: Comm
 
 const HANDLE_DIST: f32 = 1.5;
 
+pub fn on_change_app_mode(
+    app_mode: Res<AppModeState>,
+    drag_handles_resource: ResMut<DragHandlesResource>,
+    mut commands: Commands,
+) {
+    if app_mode.is_mode(AppMode::Translate) || !app_mode.is_changed() {
+        return;
+    }
+    let handle_entity = drag_handles_resource.entity;
+
+    info!("deselect translatable");
+    info!("handle_entity: {:?}", handle_entity);
+
+    // Properly despawn the handle entity
+    commands.entity(handle_entity).despawn();
+}
+
 pub fn on_select_translatable(
     trigger: Trigger<EntitySelectedEvent>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>, // Resource to store mesh data
     mut materials: ResMut<Assets<StandardMaterial>>, // Resource to store material data)
     mut drag_handles_resource: ResMut<DragHandlesResource>,
+    app_mode: Res<AppModeState>,
 ) {
+    if !app_mode.is_mode(AppMode::Translate) {
+        return;
+    }
     let target = trigger.target();
 
     info!("selected something translatable");

@@ -27,22 +27,22 @@ const SHADER_ASSET_PATH: &str = "shaders/sdf_compute.wgsl";
 #[derive(
     Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable, bevy::render::render_resource::ShaderType,
 )]
-pub struct SceneSdfResult {
+pub struct SdfResult {
     pub distance: f32,
-    pub material_id: u32,
+    // pub position: Vec3,
 }
 
 /// Request for SDF evaluation
 #[derive(Debug, Clone)]
 pub struct SdfEvaluationRequest {
-    pub points: Vec<GpuVec3>,
+    pub points: Vec<Vec2>,
     pub id: u64,
 }
 
 /// Response from SDF evaluation
 #[derive(Debug, Clone)]
 pub struct SdfEvaluationResponse {
-    pub results: Vec<SceneSdfResult>,
+    pub results: Vec<SdfResult>,
     pub id: u64,
 }
 
@@ -135,21 +135,21 @@ impl FromWorld for SdfComputeBuffers {
 
         let query_points_buffer = render_device.create_buffer(&BufferDescriptor {
             label: Some("sdf_query_points_buffer"),
-            size: (initial_capacity * std::mem::size_of::<GpuVec3>()) as u64,
+            size: (initial_capacity * std::mem::size_of::<Vec2>()) as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let results_buffer = render_device.create_buffer(&BufferDescriptor {
             label: Some("sdf_results_buffer"),
-            size: (initial_capacity * std::mem::size_of::<SceneSdfResult>()) as u64,
+            size: (initial_capacity * std::mem::size_of::<SdfResult>()) as u64,
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 
         let readback_buffer = render_device.create_buffer(&BufferDescriptor {
             label: Some("sdf_readback_buffer"),
-            size: (initial_capacity * std::mem::size_of::<SceneSdfResult>()) as u64,
+            size: (initial_capacity * std::mem::size_of::<SdfResult>()) as u64,
             usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -224,9 +224,9 @@ impl FromWorld for SdfComputePipeline {
                 ShaderStages::COMPUTE,
                 (
                     // Query points buffer
-                    storage_buffer_read_only::<GpuVec3>(false),
+                    storage_buffer_read_only::<Vec2>(false),
                     // Results buffer
-                    storage_buffer::<SceneSdfResult>(false),
+                    storage_buffer::<SdfResult>(false),
                 ),
             ),
         );
@@ -292,21 +292,21 @@ fn process_sdf_requests(
 
             buffers.query_points_buffer = render_device.create_buffer(&BufferDescriptor {
                 label: Some("sdf_query_points_buffer"),
-                size: (new_capacity * std::mem::size_of::<GpuVec3>()) as u64,
+                size: (new_capacity * std::mem::size_of::<Vec2>()) as u64,
                 usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
 
             buffers.results_buffer = render_device.create_buffer(&BufferDescriptor {
                 label: Some("sdf_results_buffer"),
-                size: (new_capacity * std::mem::size_of::<SceneSdfResult>()) as u64,
+                size: (new_capacity * std::mem::size_of::<SdfResult>()) as u64,
                 usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
                 mapped_at_creation: false,
             });
 
             buffers.readback_buffer = render_device.create_buffer(&BufferDescriptor {
                 label: Some("sdf_readback_buffer"),
-                size: (new_capacity * std::mem::size_of::<SceneSdfResult>()) as u64,
+                size: (new_capacity * std::mem::size_of::<SdfResult>()) as u64,
                 usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             });
@@ -340,14 +340,22 @@ fn perform_gpu_readback(
                 // Read the data
                 let buffer_slice = buffers.readback_buffer.slice(..);
                 let mapped_range = buffer_slice.get_mapped_range();
+
+                const RESULT_SIZE: usize = std::mem::size_of::<SdfResult>();
+
                 let results_data = mapped_range
-                    .chunks_exact(std::mem::size_of::<SceneSdfResult>())
+                    .chunks_exact(RESULT_SIZE)
                     .take(points_count)
                     .map(|chunk| {
-                        let bytes: [u8; 8] = chunk.try_into().unwrap();
-                        bytemuck::from_bytes::<SceneSdfResult>(&bytes).clone()
+                        let bytes: [u8; RESULT_SIZE] = chunk.try_into().unwrap();
+
+                        let result = bytemuck::from_bytes::<SdfResult>(&bytes).clone();
+                        info!("{:?} res", result);
+                        return result;
                     })
                     .collect::<Vec<_>>();
+
+                info!("result {:?}", results_data);
 
                 drop(mapped_range);
                 buffers.readback_buffer.unmap();
@@ -357,7 +365,7 @@ fn perform_gpu_readback(
                     id: request.id,
                 };
 
-                print!("res {:?}", response);
+                info!("res {:?}", response);
 
                 let _ = sender.send(response);
             }
@@ -459,7 +467,7 @@ impl render_graph::Node for SdfComputeNode {
                 0,
                 &buffers.readback_buffer,
                 0,
-                (buffers.current_capacity * std::mem::size_of::<SceneSdfResult>()) as u64,
+                (buffers.current_capacity * std::mem::size_of::<SdfResult>()) as u64,
             );
         }
 
@@ -475,7 +483,7 @@ pub struct SdfEvaluationFuture {
 }
 
 impl Future for SdfEvaluationFuture {
-    type Output = Vec<SceneSdfResult>;
+    type Output = Vec<SdfResult>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut waker = self.waker.lock().unwrap();
@@ -500,7 +508,7 @@ impl Future for SdfEvaluationFuture {
 
 /// Public API function to evaluate SDF at given points (async)
 pub fn evaluate_sdf_async(
-    points: Vec<GpuVec3>,
+    points: Vec<Vec2>,
     sender: &SdfEvaluationSender,
     receiver: &SdfEvaluationReceiver,
 ) -> SdfEvaluationFuture {

@@ -1,3 +1,4 @@
+use crate::mode::AppModeState;
 use bevy::prelude::*;
 
 // Plugin for the selection system
@@ -7,7 +8,8 @@ impl Plugin for SelectionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SelectionState>()
             .add_event::<EntitySelectedEvent>()
-            .add_event::<EntityDeselectedEvent>();
+            .add_event::<EntityDeselectedEvent>()
+            .add_systems(Update, on_change_app_mode);
     }
 }
 
@@ -33,7 +35,13 @@ pub fn handle_selection(
     click: Trigger<Pointer<Click>>,
     mut commands: Commands,
     mut selection_state: ResMut<SelectionState>,
+    mode_state: Res<AppModeState>,
 ) {
+    // Early return if selection is not enabled for the current mode
+    if !mode_state.is_selection_enabled() {
+        return;
+    }
+
     info!("something");
     // Get entity from pointer interactions
     let entity = click.target();
@@ -53,4 +61,13 @@ pub fn handle_selection(
         selection_state.selected_entity = Some(entity);
         commands.trigger_targets(EntitySelectedEvent, entity);
     }
+}
+pub fn on_change_app_mode(
+    app_mode: Res<AppModeState>,
+    mut selection_state: ResMut<SelectionState>,
+) {
+    if !app_mode.is_changed() || app_mode.is_selection_enabled() {
+        return;
+    }
+    selection_state.selected_entity = None;
 }

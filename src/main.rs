@@ -1,33 +1,30 @@
 use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, window::WindowResolution};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use crossbeam_queue::SegQueue;
 use std::env;
-use std::sync::LazyLock;
 use std::time::Duration;
-use wasm_bindgen::prelude::wasm_bindgen;
 
+mod brush_mode;
+mod js_bridge;
+mod mode;
 mod overlay;
 mod post_process;
 mod sdf_compute;
 mod selection;
 mod translation;
 
+use brush_mode::BrushModePlugin;
+use js_bridge::JSBridgePlugin;
+pub use js_bridge::{spawn_sphere_at_origin, test_sdf_evaluation};
+use mode::ModePlugin;
+pub use mode::{switch_to_brush_mode, switch_to_translate_mode, AppMode, AppModeState};
 use overlay::OverlayPlugin;
 use post_process::{PostProcessEntity, PostProcessPlugin, PostProcessSettings};
-use sdf_compute::{
-    evaluate_sdf_async, GpuVec3, SdfComputePlugin, SdfEvaluationReceiver, SdfEvaluationSender,
-};
-use selection::{handle_selection, SelectionPlugin};
+use sdf_compute::SdfComputePlugin;
+use selection::SelectionPlugin;
 use translation::{DragData, Translatable, TranslationPlugin};
 
-enum JSCommand {
-    SpawnSphereCommand { position: Vec3, color: Color },
-    EvaluateSdfCommand { points: Vec<Vec3> },
-}
-
-// Global thread-safe queue for JS commands
-static SPAWN_QUEUE: LazyLock<SegQueue<JSCommand>> = LazyLock::new(|| SegQueue::new());
+use crate::selection::handle_selection;
 
 #[derive(Resource)]
 struct AutoCloseTimer {
@@ -63,19 +60,15 @@ fn main() {
         ))
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(MeshPickingPlugin)
+        .add_plugins(ModePlugin)
         .add_plugins(SelectionPlugin)
         .add_plugins(OverlayPlugin)
         .add_plugins(TranslationPlugin)
         .add_plugins(SdfComputePlugin)
+        .add_plugins(BrushModePlugin)
+        .add_plugins(JSBridgePlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(
-            Update,
-            (
-                process_js_commands,
-                process_sdf_responses,
-                auto_close_system,
-            ),
-        )
+        .add_systems(Update, (auto_close_system, handle_mode_switching))
         .insert_resource(DragData::default())
         .insert_resource(AutoCloseTimer::new())
         .run();
@@ -132,8 +125,7 @@ fn setup_system(
             })),
             GlobalTransform::default(),
         ))
-        .observe(handle_selection)
-        .observe(drag_paint);
+        .observe(handle_selection);
 
     // Spawn a blue sphere
     commands
@@ -151,8 +143,7 @@ fn setup_system(
             Translatable,
             PostProcessEntity,
         ))
-        .observe(handle_selection)
-        .observe(drag_paint);
+        .observe(handle_selection);
 
     // Spawn a green sphere
     commands
@@ -170,94 +161,9 @@ fn setup_system(
             Translatable,
             PostProcessEntity,
         ))
-        .observe(handle_selection)
-        .observe(drag_paint);
-}
+        .observe(handle_selection);
 
-// System to process sphere spawn commands from the queue
-fn process_js_commands(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    camera: Query<(&Camera, &GlobalTransform)>,
-    sdf_sender: Res<SdfEvaluationSender>,
-    sdf_receiver: Res<SdfEvaluationReceiver>,
-) {
-    while let Some(cmd) = SPAWN_QUEUE.pop() {
-        match cmd {
-            JSCommand::SpawnSphereCommand { position, color } => {
-                commands
-                    .spawn((
-                        Translatable,
-                        PostProcessEntity,
-                        Transform::from_translation(position),
-                        Mesh3d(meshes.add(Sphere {
-                            radius: 1.0,
-                            ..default()
-                        })),
-                        MeshMaterial3d(materials.add(StandardMaterial {
-                            base_color: color,
-                            ..default()
-                        })),
-                        GlobalTransform::default(),
-                    ))
-                    .observe(handle_selection);
-            }
-            JSCommand::EvaluateSdfCommand { points } => {
-                let mut gpu_points: Vec<GpuVec3> = Vec::new();
-                for p in points {
-                    gpu_points.push(GpuVec3 {
-                        x: p.x,
-                        y: p.y,
-                        z: p.z,
-                        _padding: 0.,
-                    });
-                }
-                info!("Starting SDF evaluation for {} points", gpu_points.len());
-                let _future = evaluate_sdf_async(gpu_points, &sdf_sender, &sdf_receiver);
-                // The future will complete asynchronously and results will be processed
-                // by the process_sdf_responses system
-            }
-        }
-    }
-}
-
-#[wasm_bindgen]
-pub fn spawn_sphere_at_origin() {
-    SPAWN_QUEUE.push(JSCommand::SpawnSphereCommand {
-        position: Vec3::new(0., 0., 0.),
-        color: Color::Srgba(Srgba::WHITE),
-    });
-}
-
-#[wasm_bindgen]
-pub fn test_sdf_evaluation() {
-    // Test SDF evaluation at a few interesting points
-    let test_points = vec![
-        Vec3::new(0.0, 0.0, 0.0),  // Center (should be inside red sphere)
-        Vec3::new(1.0, 0.0, 0.0),  // Edge of red sphere
-        Vec3::new(2.0, 0.0, 0.0),  // Center of blue sphere
-        Vec3::new(-2.0, 0.0, 0.0), // Center of green sphere
-        Vec3::new(0.0, 2.0, 0.0),  // Above spheres
-        Vec3::new(5.0, 0.0, 0.0),  // Far away
-    ];
-
-    SPAWN_QUEUE.push(JSCommand::EvaluateSdfCommand {
-        points: test_points,
-    });
-}
-
-// System to process SDF evaluation responses and print results
-fn process_sdf_responses(sdf_receiver: Res<SdfEvaluationReceiver>) {
-    while let Some(response) = sdf_receiver.0.try_recv() {
-        info!("SDF Evaluation Results (ID: {}):", response.id);
-        for (i, result) in response.results.iter().enumerate() {
-            info!(
-                "  Point {}: distance = {:.3}, material_id = {}",
-                i, result.distance, result.material_id
-            );
-        }
-    }
+    // drag_paint observer is now added by BrushModePlugin
 }
 
 fn auto_close_system(
@@ -274,12 +180,16 @@ fn auto_close_system(
     }
 }
 
-fn drag_paint(trigger: Trigger<Pointer<Drag>>, camera: Query<(&Camera, &GlobalTransform)>) {
-    // do something on drag
-    let target = trigger.target();
-    let viewport_position = trigger.pointer_location.position;
-    let Ok((cam, camera_transform)) = camera.single() else {
-        return;
-    };
-    let ray = cam.viewport_to_world(camera_transform, viewport_position);
+// System to handle keyboard input for mode switching
+fn handle_mode_switching(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut mode_state: ResMut<AppModeState>,
+) {
+    if keyboard_input.just_pressed(KeyCode::Digit1) {
+        info!("Switching to Translate mode");
+        mode_state.set_mode(AppMode::Translate);
+    } else if keyboard_input.just_pressed(KeyCode::Digit2) {
+        info!("Switching to Brush mode");
+        mode_state.set_mode(AppMode::Brush);
+    }
 }

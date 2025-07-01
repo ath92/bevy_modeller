@@ -17,10 +17,10 @@ struct RaymarchConfig {
     surface_threshold: f32,
 }
 
-// Result of SDF evaluation including distance and material information
+// Result of SDF evaluation including distance
 struct SceneSdfResult {
     distance: f32,
-    material_id: u32,
+    position: vec3<f32>,
 }
 
 // Settings structure (must match Rust side)
@@ -41,10 +41,10 @@ struct PostProcessSettings {
 @group(1) @binding(1) var<storage, read> entity_transforms: array<mat4x4<f32>>;
 
 // Initialize a scene SDF result with default values
-fn init_scene_sdf_result() -> SceneSdfResult {
+fn init_scene_sdf_result(point: vec3<f32>) -> SceneSdfResult {
     var result: SceneSdfResult;
     result.distance = 999999.0; // Large initial distance
-    result.material_id = 0u;
+    result.position = point;
     return result;
 }
 
@@ -85,28 +85,19 @@ fn combine_sphere_into_scene_result(
     point: vec3<f32>,
     sphere_center: vec3<f32>,
     sphere_radius: f32,
-    material_id: u32,
     smoothing_factor: f32,
     is_first: bool
 ) -> SceneSdfResult {
     let sphere_distance = sphere_sdf(point, sphere_center, sphere_radius);
 
-    var result: SceneSdfResult;
+    var result = current_result;
 
     if (is_first) {
         // First sphere - just use its values
         result.distance = sphere_distance;
-        result.material_id = material_id;
     } else {
         // Combine with existing result using smooth minimum
         result.distance = smooth_min(current_result.distance, sphere_distance, smoothing_factor);
-
-        // Choose material ID based on which surface is closer
-        if (sphere_distance < current_result.distance) {
-            result.material_id = material_id;
-        } else {
-            result.material_id = current_result.material_id;
-        }
     }
 
     return result;
@@ -114,7 +105,7 @@ fn combine_sphere_into_scene_result(
 
 // Evaluate SDF at a specific point using the scene data from the dedicated bind group
 fn evaluate_scene_sdf(point: vec3<f32>) -> SceneSdfResult {
-    var result = init_scene_sdf_result();
+    var result = init_scene_sdf_result(point);
     let smoothing_factor = 0.5; // Adjust for more/less blending
 
     for (var i = 0u; i < sdf_settings.entity_count; i++) {
@@ -130,7 +121,6 @@ fn evaluate_scene_sdf(point: vec3<f32>) -> SceneSdfResult {
             point,
             sphere_center,
             sphere_radius,
-            i,
             smoothing_factor,
             i == 0u
         );
@@ -189,7 +179,34 @@ fn get_inverse_view_projection() -> mat4x4<f32> {
     return sdf_settings.inverse_view_projection;
 }
 
-// Get entity count from SDF settings
-fn get_entity_count() -> u32 {
-    return sdf_settings.entity_count;
+fn raymarch(uv: vec2<f32>, ray_origin: vec3<f32>, config: RaymarchConfig) -> SceneSdfResult {
+    // Ray direction using actual camera matrices
+    let ray_dir = get_ray_direction(uv, get_inverse_view_projection());
+
+    var ray_pos = ray_origin;
+    var total_distance = 0.0;
+
+    // Raymarching loop
+    for (var step = 0; step < config.max_steps; step++) {
+        let sdf_result = evaluate_scene_sdf(ray_pos);
+
+        // If we're close enough to a surface, we've hit something
+        if (sdf_result.distance < config.surface_threshold) {
+            return sdf_result;
+        }
+
+        // If we've traveled too far, we haven't hit anything
+        if (total_distance > config.max_distance) {
+            break;
+        }
+
+        // March along the ray
+        ray_pos += ray_dir * sdf_result.distance;
+        total_distance += sdf_result.distance;
+    }
+
+    var result: SceneSdfResult;
+    result.distance = config.max_distance;
+    result.position = ray_pos;
+    return result;
 }
