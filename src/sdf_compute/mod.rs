@@ -5,20 +5,18 @@
 //! and shares the same scene data (entity transforms and settings).
 
 use bevy::{
+    core_pipeline::core_3d::graph::{Core3d, Node3d},
     prelude::*,
     render::{
         extract_component::ComponentUniforms,
-        render_graph::{self, RenderGraph, RenderLabel},
+        render_graph::{self, RenderGraphApp, RenderLabel},
         render_resource::{binding_types::*, *},
         renderer::{RenderContext, RenderDevice, RenderQueue},
         Render, RenderApp, RenderSet,
     },
 };
-use crossbeam_channel::{Receiver, Sender};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll, Waker};
+use crossbeam_channel;
+use futures::channel::oneshot;
 
 const SHADER_ASSET_PATH: &str = "shaders/sdf_compute.wgsl";
 
@@ -33,34 +31,20 @@ pub struct SdfResult {
 }
 
 /// Request for SDF evaluation
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SdfEvaluationRequest {
     pub points: Vec<Vec2>,
     pub id: u64,
+    pub response_tx: oneshot::Sender<Vec<SdfResult>>,
 }
 
-/// Response from SDF evaluation
-#[derive(Debug, Clone)]
-pub struct SdfEvaluationResponse {
-    pub results: Vec<SdfResult>,
-    pub id: u64,
-}
-
-/// Resource for sending SDF evaluation requests
-#[derive(Resource)]
-pub struct SdfEvaluationSender(pub Sender<SdfEvaluationRequest>);
-
-/// Resource for receiving SDF evaluation responses
-#[derive(Resource)]
-pub struct SdfEvaluationReceiver(pub Receiver<SdfEvaluationResponse>);
-
-/// Resource for sending responses from render world to main world
-#[derive(Resource, Deref)]
-struct RenderWorldSender(Sender<SdfEvaluationResponse>);
+/// Resource for sending SDF evaluation requests to render world
+#[derive(Resource, Clone)]
+pub struct SdfEvaluationSender(pub crossbeam_channel::Sender<SdfEvaluationRequest>);
 
 /// Resource for receiving requests in render world
 #[derive(Resource, Deref)]
-struct RenderWorldReceiver(Receiver<SdfEvaluationRequest>);
+struct RenderWorldReceiver(crossbeam_channel::Receiver<SdfEvaluationRequest>);
 
 /// GPU-aligned Vec3 for proper buffer alignment (16 bytes instead of 12)
 #[repr(C)]
@@ -85,15 +69,12 @@ impl Plugin for SdfComputePlugin {
 
     fn finish(&self, app: &mut App) {
         let (request_sender, request_receiver) = crossbeam_channel::unbounded();
-        let (response_sender, response_receiver) = crossbeam_channel::unbounded();
 
-        app.insert_resource(SdfEvaluationSender(request_sender))
-            .insert_resource(SdfEvaluationReceiver(response_receiver));
+        app.insert_resource(SdfEvaluationSender(request_sender));
 
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .insert_resource(RenderWorldReceiver(request_receiver))
-            .insert_resource(RenderWorldSender(response_sender))
             .init_resource::<SdfComputePipeline>()
             .init_resource::<SdfComputeBuffers>()
             .init_resource::<PendingSdfRequests>()
@@ -108,15 +89,18 @@ impl Plugin for SdfComputePlugin {
                             >,
                         ),
                     process_sdf_requests.before(RenderSet::Render),
-                    perform_gpu_readback.after(RenderSet::Render),
+                    initiate_gpu_readback.after(RenderSet::Render),
+                    perform_delayed_readback.in_set(RenderSet::PostCleanup),
                 ),
             );
 
         // Add the compute node to the render graph
         render_app
-            .world_mut()
-            .resource_mut::<RenderGraph>()
-            .add_node(SdfComputeNodeLabel, SdfComputeNode::default());
+            .add_render_graph_node::<SdfComputeNode>(Core3d, SdfComputeNodeLabel)
+            .add_render_graph_edges(
+                Core3d,
+                (Node3d::EndMainPassPostProcessing, SdfComputeNodeLabel),
+            );
     }
 }
 
@@ -133,6 +117,7 @@ impl FromWorld for SdfComputeBuffers {
         let render_device = world.resource::<RenderDevice>();
         let initial_capacity = 1024; // Start with capacity for 1024 points
 
+        info!("create buffers");
         let query_points_buffer = render_device.create_buffer(&BufferDescriptor {
             label: Some("sdf_query_points_buffer"),
             size: (initial_capacity * std::mem::size_of::<Vec2>()) as u64,
@@ -268,8 +253,11 @@ impl FromWorld for SdfComputePipeline {
 /// Pending SDF requests waiting for GPU readback
 #[derive(Resource, Default)]
 struct PendingSdfRequests {
-    requests: Vec<(SdfEvaluationRequest, usize)>, // (request, points_count)
-    pending_mapping: Option<(SdfEvaluationRequest, usize, crossbeam_channel::Receiver<()>)>, // (request, points_count, receiver)
+    requests: Vec<SdfEvaluationRequest>,
+    completed_requests: Vec<SdfEvaluationRequest>,
+    pending_mapping: Option<(SdfEvaluationRequest, crossbeam_channel::Receiver<()>)>, // (request, receiver)
+    ready_for_mapping: Vec<SdfEvaluationRequest>,
+    buffer_is_mapped: bool, // Track whether the readback buffer is currently mapped
 }
 
 fn process_sdf_requests(
@@ -277,17 +265,24 @@ fn process_sdf_requests(
     render_queue: Res<RenderQueue>,
     mut buffers: ResMut<SdfComputeBuffers>,
     mut pending_requests: ResMut<PendingSdfRequests>,
-    receiver: Res<RenderWorldReceiver>,
+    receiver: ResMut<RenderWorldReceiver>,
 ) {
     // Process new incoming requests
     while let Some(request) = receiver.try_recv() {
+        // info!(
+        //     "Received SDF request with ID: {} for {} points",
+        //     request.id,
+        //     request.points.len()
+        // );
         let points_count = request.points.len();
         if points_count == 0 {
+            info!("Skipping empty SDF request");
             continue;
         }
 
         // Resize buffers if needed
         if points_count > buffers.current_capacity {
+            info!("new buffers");
             let new_capacity = (points_count * 2).max(1024);
 
             buffers.query_points_buffer = render_device.create_buffer(&BufferDescriptor {
@@ -319,92 +314,112 @@ fn process_sdf_requests(
         render_queue.write_buffer(&buffers.query_points_buffer, 0, points_data);
 
         // Add to pending requests for GPU readback after compute dispatch
-        pending_requests.requests.push((request, points_count));
+        // info!("Adding SDF request ID: {} to pending queue", request.id);
+        pending_requests.requests.push(request);
     }
 }
 
-fn perform_gpu_readback(
-    render_device: Res<RenderDevice>,
+fn initiate_gpu_readback(mut pending_requests: ResMut<PendingSdfRequests>) {
+    // Move completed requests from the main queue if needed
+    if pending_requests.completed_requests.is_empty() && !pending_requests.requests.is_empty() {
+        let requests_to_move: Vec<_> = pending_requests.requests.drain(..).collect();
+        pending_requests.completed_requests.extend(requests_to_move);
+    }
+
+    // Move completed requests to ready_for_mapping queue for delayed processing
+    if !pending_requests.completed_requests.is_empty() {
+        info!(
+            "Marking {} requests ready for mapping",
+            pending_requests.completed_requests.len()
+        );
+        let requests_to_map: Vec<_> = pending_requests.completed_requests.drain(..).collect();
+        pending_requests.ready_for_mapping.extend(requests_to_map);
+    }
+}
+
+fn perform_delayed_readback(
+    _render_device: Res<RenderDevice>,
     buffers: Res<SdfComputeBuffers>,
     mut pending_requests: ResMut<PendingSdfRequests>,
-    sender: Res<RenderWorldSender>,
 ) {
-    // Use non-blocking poll to advance GPU operations
-    render_device.poll(Maintain::Poll);
-
-    // First, check if we have a pending mapping
-    if let Some((request, points_count, rx)) = pending_requests.pending_mapping.take() {
+    // Check if we have a pending mapping
+    if let Some((request, rx)) = pending_requests.pending_mapping.take() {
         // Check if mapping is complete (non-blocking)
         match rx.try_recv() {
             Some(_) => {
-                // Read the data
-                let buffer_slice = buffers.readback_buffer.slice(..);
-                let mapped_range = buffer_slice.get_mapped_range();
+                // Read the data - wrap in a closure to ensure cleanup on error
+                let read_result = (|| -> Result<Vec<SdfResult>, &'static str> {
+                    let buffer_slice = buffers.readback_buffer.slice(..);
+                    let mapped_range = buffer_slice.get_mapped_range();
 
-                const RESULT_SIZE: usize = std::mem::size_of::<SdfResult>();
+                    const RESULT_SIZE: usize = std::mem::size_of::<SdfResult>();
+                    let points_count = request.points.len();
 
-                let results_data = mapped_range
-                    .chunks_exact(RESULT_SIZE)
-                    .take(points_count)
-                    .map(|chunk| {
-                        let bytes: [u8; RESULT_SIZE] = chunk.try_into().unwrap();
+                    let mut results_data = Vec::new();
+                    for chunk in mapped_range.chunks_exact(RESULT_SIZE).take(points_count) {
+                        let bytes: [u8; RESULT_SIZE] = chunk
+                            .try_into()
+                            .map_err(|_| "Failed to convert chunk to byte array")?;
+                        results_data.push(bytemuck::from_bytes::<SdfResult>(&bytes).clone());
+                    }
 
-                        let result = bytemuck::from_bytes::<SdfResult>(&bytes).clone();
-                        info!("{:?} res", result);
-                        return result;
-                    })
-                    .collect::<Vec<_>>();
+                    Ok(results_data)
+                })();
 
-                info!("result {:?}", results_data);
-
-                drop(mapped_range);
+                // Always unmap the buffer regardless of success/failure
                 buffers.readback_buffer.unmap();
+                pending_requests.buffer_is_mapped = false;
 
-                let response = SdfEvaluationResponse {
-                    results: results_data,
-                    id: request.id,
-                };
+                info!("Sending results for request ID: {}", request.id);
 
-                info!("res {:?}", response);
-
-                let _ = sender.send(response);
+                // Send results through oneshot channel
+                match read_result {
+                    Ok(results_data) => {
+                        let _ = request.response_tx.send(results_data);
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to read buffer data: {:?}", err);
+                        // Send empty results on error
+                        let _ = request.response_tx.send(vec![]);
+                    }
+                }
             }
-            None => {
-                // Mapping not ready yet, keep it for next frame
-                info!("mapping not ready, keeping for next frame");
-                pending_requests.pending_mapping = Some((request, points_count, rx));
-                return;
-            }
+            None => {}
         }
     }
 
-    // If no pending mapping, start a new one if we have requests
-    if pending_requests.requests.is_empty() {
-        return;
+    // Start a new mapping if we have requests ready
+    if pending_requests.pending_mapping.is_none()
+        && !pending_requests.ready_for_mapping.is_empty()
+        && !pending_requests.buffer_is_mapped
+    {
+        info!(
+            "Starting GPU readback for 1 of {} ready requests",
+            pending_requests.ready_for_mapping.len()
+        );
+
+        // Process one request at a time to minimize GPU impact
+        let request = pending_requests.ready_for_mapping.remove(0);
+
+        // Map the readback buffer to read results
+        let buffer_slice = buffers.readback_buffer.slice(..);
+        let (tx, rx) = crossbeam_channel::unbounded::<()>();
+        info!("MAP ASYNC!");
+        buffer_slice.map_async(MapMode::Read, move |result| match result {
+            Ok(_) => {
+                let _ = tx.send(());
+            }
+            Err(err) => {
+                eprintln!("Failed to map buffer: {:?}", err);
+                // Send signal even on error so we can cleanup
+                let _ = tx.send(());
+            }
+        });
+
+        // Store the pending mapping for next frame
+        pending_requests.pending_mapping = Some((request, rx));
+        pending_requests.buffer_is_mapped = true;
     }
-
-    info!("starting new readback");
-
-    // Process one request at a time to avoid complexity
-    let (request, points_count) = pending_requests.requests.remove(0);
-
-    // Map the readback buffer to read results
-    let buffer_slice = buffers.readback_buffer.slice(..);
-
-    let (tx, rx) = crossbeam_channel::unbounded::<()>();
-
-    buffer_slice.map_async(MapMode::Read, move |result| match result {
-        Ok(_) => {
-            let _ = tx.send(());
-        }
-        Err(err) => {
-            eprintln!("Failed to map buffer: {:?}", err);
-            let _ = tx.send(());
-        }
-    });
-
-    // Store the pending mapping for next frame
-    pending_requests.pending_mapping = Some((request, points_count, rx));
 }
 
 /// Label to identify the SDF compute node in the render graph
@@ -443,11 +458,11 @@ impl render_graph::Node for SdfComputeNode {
 
                 // Dispatch workgroups based on pending requests
                 let pending_requests = world.resource::<PendingSdfRequests>();
-                if !pending_requests.requests.is_empty() {
+                if !pending_requests.requests.is_empty() && !pending_requests.buffer_is_mapped {
                     let max_points = pending_requests
                         .requests
                         .iter()
-                        .map(|(_, count)| *count)
+                        .map(|req| req.points.len())
                         .max()
                         .unwrap_or(0);
                     let workgroups = (max_points as u32 + 63) / 64; // 64 threads per workgroup
@@ -461,7 +476,7 @@ impl render_graph::Node for SdfComputeNode {
         let buffers = world.resource::<SdfComputeBuffers>();
         let pending_requests = world.resource::<PendingSdfRequests>();
 
-        if !pending_requests.requests.is_empty() {
+        if !pending_requests.requests.is_empty() && !pending_requests.buffer_is_mapped {
             render_context.command_encoder().copy_buffer_to_buffer(
                 &buffers.results_buffer,
                 0,
@@ -475,52 +490,27 @@ impl render_graph::Node for SdfComputeNode {
     }
 }
 
-/// Future that resolves when SDF evaluation is complete
-pub struct SdfEvaluationFuture {
-    receiver: Arc<Mutex<Option<Receiver<SdfEvaluationResponse>>>>,
-    id: u64,
-    waker: Arc<Mutex<Option<Waker>>>,
-}
-
-impl Future for SdfEvaluationFuture {
-    type Output = Vec<SdfResult>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut waker = self.waker.lock().unwrap();
-        *waker = Some(cx.waker().clone());
-        drop(waker);
-
-        let mut receiver_opt = self.receiver.lock().unwrap();
-        if let Some(receiver) = receiver_opt.as_ref() {
-            match receiver.try_recv() {
-                Some(response) if response.id == self.id => {
-                    *receiver_opt = None;
-                    Poll::Ready(response.results)
-                }
-                Some(_) => Poll::Pending, // Wrong ID, keep waiting
-                None => Poll::Pending,    // No data yet
-            }
-        } else {
-            Poll::Pending
-        }
-    }
-}
-
 /// Public API function to evaluate SDF at given points (async)
-pub fn evaluate_sdf_async(
+pub async fn evaluate_sdf_async(
     points: Vec<Vec2>,
     sender: &SdfEvaluationSender,
-    receiver: &SdfEvaluationReceiver,
-) -> SdfEvaluationFuture {
+) -> Result<Vec<SdfResult>, oneshot::Canceled> {
     let id = REQUEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // info!(
+    //     "Sending SDF evaluation request with ID: {} for {} points",
+    //     id,
+    //     points.len()
+    // );
 
-    let request = SdfEvaluationRequest { points, id };
+    let (response_tx, response_rx) = oneshot::channel();
+    let request = SdfEvaluationRequest {
+        points,
+        id,
+        response_tx,
+    };
 
     let _ = sender.0.send(request);
 
-    SdfEvaluationFuture {
-        receiver: Arc::new(Mutex::new(Some(receiver.0.clone()))),
-        id,
-        waker: Arc::new(Mutex::new(None)),
-    }
+    // info!("Awaiting SDF evaluation response for ID: {}", id);
+    response_rx.await
 }

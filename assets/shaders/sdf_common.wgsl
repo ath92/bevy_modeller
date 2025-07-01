@@ -32,6 +32,7 @@ struct PostProcessSettings {
     camera_position: vec3<f32>,
     entity_count: u32,
     inverse_view_projection: mat4x4<f32>,
+    time: f32,
 }
 
 // Dedicated bind group for SDF scene data (Group 1)
@@ -53,7 +54,7 @@ fn default_raymarch_config() -> RaymarchConfig {
     var config: RaymarchConfig;
     config.max_steps = 64;
     config.max_distance = 50.0;
-    config.surface_threshold = 0.01;
+    config.surface_threshold = 0.01 + abs(sin(sdf_settings.time)) * 0.05;
     return config;
 }
 

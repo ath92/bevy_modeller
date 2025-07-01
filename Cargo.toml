@@ -11,6 +11,7 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 bytemuck = { version = "1.14", features = ["derive"] }
 crossbeam-queue = "0.3"
 crossbeam-channel = "0.2.5"
+futures = "0.3"
 wasm-bindgen = "0.2.97"
 wasm-bindgen-futures = "0.4.45"
 web-sys = { version = "0.3.74", features = [

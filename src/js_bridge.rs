@@ -5,7 +5,7 @@ use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
 use crate::mode::{AppMode, AppModeState};
 use crate::post_process::PostProcessEntity;
-use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationReceiver, SdfEvaluationSender};
+use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationSender};
 use crate::translation::Translatable;
 
 pub struct JSBridgePlugin;
@@ -38,7 +38,6 @@ pub fn process_js_commands(
     mut materials: ResMut<Assets<StandardMaterial>>,
     _camera: Query<(&Camera, &GlobalTransform)>,
     sdf_sender: Res<SdfEvaluationSender>,
-    sdf_receiver: Res<SdfEvaluationReceiver>,
     mut mode_state: ResMut<AppModeState>,
 ) {
     while let Some(cmd) = SPAWN_QUEUE.pop() {
@@ -65,19 +64,26 @@ pub fn process_js_commands(
                     gpu_points.push(Vec2 { x: p.x, y: p.y });
                 }
                 info!("Starting SDF evaluation for {} points", gpu_points.len());
-                let future = evaluate_sdf_async(gpu_points, &sdf_sender, &sdf_receiver);
-                // The future will complete asynchronously and results will be processed
-                // by the process_sdf_responses system
+                
+                // Clone the sender to move into the async task
+                let sender_clone = sdf_sender.clone();
+                
                 // Spawn the future and handle results when ready
+                info!("Spawning async task for SDF evaluation");
                 bevy::tasks::AsyncComputeTaskPool::get()
                     .spawn(async move {
-                        let results = future.await;
-                        info!("SDF Evaluation Results:");
+                        info!("Async task started, waiting for SDF results...");
+                        let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await else {
+                            return;
+                        };
+                        info!("SDF Evaluation Results received!");
                         for (i, result) in results.iter().enumerate() {
                             info!("  Point {}: distance = {:.3}", i, result.distance);
                         }
+                        info!("SDF evaluation task completed successfully!");
                     })
                     .detach();
+                info!("Async task spawned and detached");
             }
             JSCommand::SetModeCommand { mode } => {
                 match mode.as_str() {

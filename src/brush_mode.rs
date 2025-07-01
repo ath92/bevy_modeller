@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use crate::mode::{AppMode, AppModeState};
-use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationReceiver, SdfEvaluationSender};
+use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationSender};
 
 pub struct BrushModePlugin;
 
@@ -54,8 +54,8 @@ fn drag_paint(
     trigger: Trigger<Pointer<Drag>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     sdf_sender: Res<SdfEvaluationSender>,
-    sdf_receiver: Res<SdfEvaluationReceiver>,
 ) {
+    info!("drag paint");
     // do something on drag
     let viewport_position = trigger.pointer_location.position;
 
@@ -69,13 +69,16 @@ fn drag_paint(
             y: viewport_position.y / height,
         });
         info!("Starting SDF evaluation for {} points", gpu_points.len());
-        let future = evaluate_sdf_async(gpu_points, &sdf_sender, &sdf_receiver);
-        // The future will complete asynchronously and results will be processed
-        // by the process_sdf_responses system
+
+        // Clone the sender to move into the async task
+        let sender_clone = sdf_sender.clone();
+
         // Spawn the future and handle results when ready
         bevy::tasks::AsyncComputeTaskPool::get()
             .spawn(async move {
-                let results = future.await;
+                let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await else {
+                    return;
+                };
                 info!("SDF Evaluation Results:");
                 for (i, result) in results.iter().enumerate() {
                     info!("  Point {}: distance = {:.3}", i, result.distance);

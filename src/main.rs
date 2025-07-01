@@ -68,7 +68,7 @@ fn main() {
         .add_plugins(BrushModePlugin)
         .add_plugins(JSBridgePlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, (auto_close_system, handle_mode_switching))
+        .add_systems(Update, auto_close_system)
         .insert_resource(DragData::default())
         .insert_resource(AutoCloseTimer::new())
         .run();
@@ -177,19 +177,5 @@ fn auto_close_system(
             info!("Auto-closing application after 15 seconds");
             exit.write(AppExit::Success);
         }
-    }
-}
-
-// System to handle keyboard input for mode switching
-fn handle_mode_switching(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut mode_state: ResMut<AppModeState>,
-) {
-    if keyboard_input.just_pressed(KeyCode::Digit1) {
-        info!("Switching to Translate mode");
-        mode_state.set_mode(AppMode::Translate);
-    } else if keyboard_input.just_pressed(KeyCode::Digit2) {
-        info!("Switching to Brush mode");
-        mode_state.set_mode(AppMode::Brush);
     }
 }

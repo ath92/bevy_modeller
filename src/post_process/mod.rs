@@ -89,6 +89,7 @@ impl Plugin for PostProcessPlugin {
                 collect_entity_transforms,
                 update_camera_settings,
                 update_entity_count_in_settings,
+                update_time_in_settings,
             ),
         );
 
@@ -390,6 +391,7 @@ impl ViewNode for PostProcessNode {
         render_pass.set_bind_group(1, &sdf_bind_group, &[settings_index.index()]);
         render_pass.draw(0..3, 0..1);
 
+        info!("post process render");
         Ok(())
     }
 }
@@ -506,6 +508,7 @@ pub struct PostProcessSettings {
     pub camera_position: Vec3,
     pub entity_count: u32,
     pub inverse_view_projection: Mat4,
+    pub time: f32,
 }
 
 // System to update PostProcessSettings with current camera data
@@ -567,5 +570,14 @@ fn update_camera_settings(
         // Compute and store the inverse view-projection matrix on CPU
         let view_proj = settings.projection_matrix * settings.view_matrix;
         settings.inverse_view_projection = view_proj.inverse();
+    }
+}
+
+fn update_time_in_settings(
+    time: Res<Time>,
+    mut camera_query: Query<&mut PostProcessSettings, With<Camera>>,
+) {
+    for mut settings in camera_query.iter_mut() {
+        settings.time = time.elapsed().as_secs_f32();
     }
 }
