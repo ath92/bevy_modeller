@@ -32,7 +32,7 @@ const SHADER_ASSET_PATH: &str = "shaders/post_processing.wgsl";
 #[derive(Resource)]
 pub struct EntityTransformBuffer {
     pub buffer: Option<Buffer>,
-    pub data: Vec<Mat4>,
+    pub data: Vec<Vec4>,
     pub capacity: usize,
 }
 
@@ -52,7 +52,7 @@ pub struct PostProcessEntity;
 
 // Resource to transfer data from main world to render world
 #[derive(Resource, Clone)]
-struct EntityTransformData(Vec<Mat4>);
+struct EntityTransformData(Vec<Vec4>);
 
 impl ExtractResource for EntityTransformData {
     type Source = EntityTransformData;
@@ -157,9 +157,13 @@ fn collect_entity_transforms(
     query: Query<&GlobalTransform, With<PostProcessEntity>>,
     mut commands: Commands,
 ) {
-    let transforms: Vec<Mat4> = query
+    let transforms: Vec<Vec4> = query
         .iter()
-        .map(|global_transform| global_transform.compute_matrix())
+        .map(|global_transform| {
+            let translation = global_transform.translation();
+            let scale = global_transform.scale().x; // Assume uniform scale, take x component
+            Vec4::new(translation.x, translation.y, translation.z, scale)
+        })
         .collect();
     // Send the data to the render world
     commands.insert_resource(EntityTransformData(transforms));
@@ -179,7 +183,7 @@ fn update_transform_buffer(
 
     // Update our CPU-side data
     transform_buffer.data = data.0.clone();
-    let data_size = transform_buffer.data.len() * std::mem::size_of::<Mat4>();
+    let data_size = transform_buffer.data.len() * std::mem::size_of::<Vec4>();
 
     // Create or resize buffer if needed
     if transform_buffer.buffer.is_none() || transform_buffer.capacity < data_size {

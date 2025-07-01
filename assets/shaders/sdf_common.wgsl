@@ -3,7 +3,7 @@
 // BIND GROUP STRUCTURE:
 // This module defines bind group 1 for SDF scene data that can be shared across shaders:
 // - Group 1, Binding 0: PostProcessSettings uniform (camera matrices, entity count, etc.)
-// - Group 1, Binding 1: Entity transforms storage buffer
+// - Group 1, Binding 1: Entity transforms storage buffer (array of vec4: x, y, z, scale)
 //
 // Shaders that import this module should:
 // 1. Use their own bind group 0 for shader-specific resources
@@ -39,7 +39,7 @@ struct PostProcessSettings {
 // This allows the common functions to access scene data directly
 // without needing pointer parameters, and keeps indexing consistent across shaders
 @group(1) @binding(0) var<uniform> sdf_settings: PostProcessSettings;
-@group(1) @binding(1) var<storage, read> entity_transforms: array<mat4x4<f32>>;
+@group(1) @binding(1) var<storage, read> entity_transforms: array<vec4<f32>>;
 
 // Initialize a scene SDF result with default values
 fn init_scene_sdf_result(point: vec3<f32>) -> SceneSdfResult {
@@ -58,15 +58,14 @@ fn default_raymarch_config() -> RaymarchConfig {
     return config;
 }
 
-// Extract position from a 4x4 transform matrix
-fn extract_position_from_transform(transform: mat4x4<f32>) -> vec3<f32> {
-    return vec3<f32>(transform[3][0], transform[3][1], transform[3][2]);
+// Extract position from a vec4 transform (x, y, z, scale)
+fn extract_position_from_transform(transform: vec4<f32>) -> vec3<f32> {
+    return transform.xyz;
 }
 
-// Extract uniform scale from a 4x4 transform matrix
-// This assumes uniform scaling and takes the length of the first column
-fn extract_scale_from_transform(transform: mat4x4<f32>) -> f32 {
-    return length(vec3<f32>(transform[0][0], transform[0][1], transform[0][2]));
+// Extract scale from a vec4 transform (x, y, z, scale)
+fn extract_scale_from_transform(transform: vec4<f32>) -> f32 {
+    return transform.w;
 }
 
 // SDF for a sphere
