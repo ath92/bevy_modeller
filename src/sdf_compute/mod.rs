@@ -257,8 +257,9 @@ struct PendingSdfRequests {
     completed_requests: Vec<SdfEvaluationRequest>,
     pending_mapping: Option<(SdfEvaluationRequest, crossbeam_channel::Receiver<()>)>, // (request, receiver)
     ready_for_mapping: Vec<SdfEvaluationRequest>,
-    buffer_is_mapped: bool, // Track whether the readback buffer is currently mapped
 }
+
+
 
 fn process_sdf_requests(
     render_device: Res<RenderDevice>,
@@ -343,10 +344,13 @@ fn perform_delayed_readback(
     mut pending_requests: ResMut<PendingSdfRequests>,
 ) {
     // Check if we have a pending mapping
-    if let Some((request, rx)) = pending_requests.pending_mapping.take() {
+    if let Some((_request, rx)) = &pending_requests.pending_mapping {
         // Check if mapping is complete (non-blocking)
         match rx.try_recv() {
             Some(_) => {
+                // Take the request to process it
+                let (request, _) = pending_requests.pending_mapping.take().unwrap();
+                
                 // Read the data - wrap in a closure to ensure cleanup on error
                 let read_result = (|| -> Result<Vec<SdfResult>, &'static str> {
                     let buffer_slice = buffers.readback_buffer.slice(..);
@@ -360,6 +364,7 @@ fn perform_delayed_readback(
                         let bytes: [u8; RESULT_SIZE] = chunk
                             .try_into()
                             .map_err(|_| "Failed to convert chunk to byte array")?;
+                        info!("{:?}", bytes);
                         results_data.push(bytemuck::from_bytes::<SdfResult>(&bytes).clone());
                     }
 
@@ -368,7 +373,6 @@ fn perform_delayed_readback(
 
                 // Always unmap the buffer regardless of success/failure
                 buffers.readback_buffer.unmap();
-                pending_requests.buffer_is_mapped = false;
 
                 info!("Sending results for request ID: {}", request.id);
 
@@ -384,15 +388,14 @@ fn perform_delayed_readback(
                     }
                 }
             }
-            None => {}
+            None => {
+                // Mapping not ready yet, keep waiting
+            }
         }
     }
 
-    // Start a new mapping if we have requests ready
-    if pending_requests.pending_mapping.is_none()
-        && !pending_requests.ready_for_mapping.is_empty()
-        && !pending_requests.buffer_is_mapped
-    {
+    // Start a new mapping if we have no pending mapping and requests are ready
+    if pending_requests.pending_mapping.is_none() && !pending_requests.ready_for_mapping.is_empty() {
         info!(
             "Starting GPU readback for 1 of {} ready requests",
             pending_requests.ready_for_mapping.len()
@@ -418,7 +421,6 @@ fn perform_delayed_readback(
 
         // Store the pending mapping for next frame
         pending_requests.pending_mapping = Some((request, rx));
-        pending_requests.buffer_is_mapped = true;
     }
 }
 
@@ -458,7 +460,7 @@ impl render_graph::Node for SdfComputeNode {
 
                 // Dispatch workgroups based on pending requests
                 let pending_requests = world.resource::<PendingSdfRequests>();
-                if !pending_requests.requests.is_empty() && !pending_requests.buffer_is_mapped {
+                if !pending_requests.requests.is_empty() && pending_requests.pending_mapping.is_none() {
                     let max_points = pending_requests
                         .requests
                         .iter()
@@ -476,7 +478,7 @@ impl render_graph::Node for SdfComputeNode {
         let buffers = world.resource::<SdfComputeBuffers>();
         let pending_requests = world.resource::<PendingSdfRequests>();
 
-        if !pending_requests.requests.is_empty() && !pending_requests.buffer_is_mapped {
+        if !pending_requests.requests.is_empty() && pending_requests.pending_mapping.is_none() {
             render_context.command_encoder().copy_buffer_to_buffer(
                 &buffers.results_buffer,
                 0,
