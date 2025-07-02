@@ -48,7 +48,10 @@ impl Default for EntityTransformBuffer {
 
 // Component to mark entities whose transforms should be sent to the shader
 #[derive(Component)]
-pub struct PostProcessEntity;
+pub struct PostProcessEntity {
+    pub position: Vec3,
+    pub scale: f32,
+}
 
 // Resource to transfer data from main world to render world
 #[derive(Resource, Clone)]
@@ -81,7 +84,11 @@ impl Plugin for PostProcessPlugin {
             UniformComponentPlugin::<PostProcessSettings>::default(),
             // Extract the EntityTransformData from main world to render world
             ExtractResourcePlugin::<EntityTransformData>::default(),
+            // Extract the PostProcessEnabled flag from main world to render world
+            ExtractResourcePlugin::<PostProcessEnabled>::default(),
         ))
+        // Initialize the PostProcessEnabled resource
+        .init_resource::<PostProcessEnabled>()
         // Add the system to collect transform data
         .add_systems(
             Update,
@@ -153,15 +160,12 @@ impl Plugin for PostProcessPlugin {
 }
 
 // System that runs in the main world to collect transform data
-fn collect_entity_transforms(
-    query: Query<&GlobalTransform, With<PostProcessEntity>>,
-    mut commands: Commands,
-) {
-    let transforms: Vec<Vec4> = query
+fn collect_entity_transforms(entity_query: Query<&PostProcessEntity>, mut commands: Commands) {
+    let transforms: Vec<Vec4> = entity_query
         .iter()
-        .map(|global_transform| {
-            let translation = global_transform.translation();
-            let scale = global_transform.scale().x; // Assume uniform scale, take x component
+        .map(|entity| {
+            let translation = entity.position;
+            let scale = entity.scale; // Assume uniform scale, take x component
             Vec4::new(translation.x, translation.y, translation.z, scale)
         })
         .collect();
@@ -277,6 +281,13 @@ impl ViewNode for PostProcessNode {
         >,
         world: &World,
     ) -> Result<(), NodeRunError> {
+        // Check if post processing is enabled, if not skip the entire pass
+        if let Some(enabled_resource) = world.get_resource::<PostProcessEnabled>() {
+            if !enabled_resource.enabled {
+                return Ok(());
+            }
+        }
+
         // Get the pipeline resource that contains the global data we need
         // to create the render pipeline
         let post_process_pipeline = world.resource::<PostProcessPipeline>();
@@ -513,6 +524,31 @@ pub struct PostProcessSettings {
     pub entity_count: u32,
     pub inverse_view_projection: Mat4,
     pub time: f32,
+}
+
+#[derive(Resource, Clone)]
+pub struct PostProcessEnabled {
+    pub enabled: bool,
+}
+
+impl Default for PostProcessEnabled {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+impl PostProcessEnabled {
+    pub fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
+}
+
+impl ExtractResource for PostProcessEnabled {
+    type Source = PostProcessEnabled;
+
+    fn extract_resource(source: &Self::Source) -> Self {
+        source.clone()
+    }
 }
 
 // System to update PostProcessSettings with current camera data

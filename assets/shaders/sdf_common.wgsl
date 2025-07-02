@@ -39,7 +39,7 @@ struct PostProcessSettings {
 // This allows the common functions to access scene data directly
 // without needing pointer parameters, and keeps indexing consistent across shaders
 @group(1) @binding(0) var<uniform> sdf_settings: PostProcessSettings;
-@group(1) @binding(1) var<storage, read> entity_transforms: array<vec4<f32>>;
+@group(1) @binding(1) var<storage, read> entities: array<vec4<f32>>;
 
 // Initialize a scene SDF result with default values
 fn init_scene_sdf_result(point: vec3<f32>) -> SceneSdfResult {
@@ -54,17 +54,17 @@ fn default_raymarch_config() -> RaymarchConfig {
     var config: RaymarchConfig;
     config.max_steps = 64;
     config.max_distance = 50.0;
-    config.surface_threshold = 0.01 + abs(sin(sdf_settings.time)) * 0.05;
+    config.surface_threshold = 0.01;
     return config;
 }
 
 // Extract position from a vec4 transform (x, y, z, scale)
-fn extract_position_from_transform(transform: vec4<f32>) -> vec3<f32> {
+fn extract_position_from_entity(transform: vec4<f32>) -> vec3<f32> {
     return transform.xyz;
 }
 
 // Extract scale from a vec4 transform (x, y, z, scale)
-fn extract_scale_from_transform(transform: vec4<f32>) -> f32 {
+fn extract_scale_from_entity(transform: vec4<f32>) -> f32 {
     return transform.w;
 }
 
@@ -77,6 +77,19 @@ fn sphere_sdf(point: vec3<f32>, center: vec3<f32>, radius: f32) -> f32 {
 fn smooth_min(a: f32, b: f32, k: f32) -> f32 {
     let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
     return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+fn circular_geometrical_smin(a: f32, b: f32, k: f32) -> f32 {
+    let k_adjusted = k * (1.0 / (1.0 - sqrt(0.5)));
+    return max(k_adjusted, min(a, b)) -
+           length(max(vec2<f32>(k_adjusted) - vec2<f32>(a, b), vec2<f32>(0.0)));
+}
+
+fn quadratic_smin( a: f32, b: f32, k: f32 ) -> f32
+{
+    let k4 = k* 4.0;
+    let h = max( k4-abs(a-b), 0.0 )/k4;
+    return min(a,b) - h*h*k4*(1.0/4.0);
 }
 
 // Combine a sphere into the existing scene result with smooth blending
@@ -97,7 +110,7 @@ fn combine_sphere_into_scene_result(
         result.distance = sphere_distance;
     } else {
         // Combine with existing result using smooth minimum
-        result.distance = smooth_min(current_result.distance, sphere_distance, smoothing_factor);
+        result.distance = circular_geometrical_smin(current_result.distance, sphere_distance, smoothing_factor);
     }
 
     return result;
@@ -109,11 +122,11 @@ fn evaluate_scene_sdf(point: vec3<f32>) -> SceneSdfResult {
     let smoothing_factor = 0.5; // Adjust for more/less blending
 
     for (var i = 0u; i < sdf_settings.entity_count; i++) {
-        let transform = entity_transforms[i];
+        let entity = entities[i];
 
         // Extract sphere properties using common utilities
-        let sphere_center = extract_position_from_transform(transform);
-        let sphere_radius = extract_scale_from_transform(transform);
+        let sphere_center = extract_position_from_entity(entity);
+        let sphere_radius = extract_scale_from_entity(entity);
 
         // Use reusable combination function from common module
         result = combine_sphere_into_scene_result(
@@ -121,7 +134,7 @@ fn evaluate_scene_sdf(point: vec3<f32>) -> SceneSdfResult {
             point,
             sphere_center,
             sphere_radius,
-            smoothing_factor,
+            smoothing_factor * sphere_radius,
             i == 0u
         );
     }

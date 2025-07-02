@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
+use crate::command_bridge::spawn_sphere_at_pos;
 use crate::mode::{AppMode, AppModeState};
+use crate::overlay::OverlayCamera;
 use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationSender};
 
 pub struct BrushModePlugin;
@@ -51,13 +53,22 @@ fn handle_mode_change_for_brush(
 }
 
 fn drag_paint(
-    trigger: Trigger<Pointer<Drag>>,
+    trigger: Trigger<Pointer<Click>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     sdf_sender: Res<SdfEvaluationSender>,
+    camera_query: Query<(&Camera, &GlobalTransform, &OverlayCamera)>,
 ) {
     info!("drag paint");
     // do something on drag
     let viewport_position = trigger.pointer_location.position;
+
+    let Ok((camera, camera_transform, _)) = camera_query.single() else {
+        return;
+    };
+
+    let Ok(ray) = camera.viewport_to_world(camera_transform, viewport_position) else {
+        return;
+    };
 
     if let Ok(window) = window_query.single() {
         let width = window.resolution.width();
@@ -81,7 +92,10 @@ fn drag_paint(
                 };
                 info!("SDF Evaluation Results:");
                 for (i, result) in results.iter().enumerate() {
-                    info!("  Point {}: distance = {:.3}", i, result.distance);
+                    let new_sphere_radius = 0.1;
+                    let pos = ray.get_point(result.distance - new_sphere_radius);
+                    info!("{:?}", pos);
+                    spawn_sphere_at_pos(pos, new_sphere_radius);
                 }
             })
             .detach();

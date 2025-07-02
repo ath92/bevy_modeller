@@ -5,7 +5,7 @@ use std::env;
 use std::time::Duration;
 
 mod brush_mode;
-mod js_bridge;
+mod command_bridge;
 mod mode;
 mod overlay;
 mod post_process;
@@ -14,17 +14,17 @@ mod selection;
 mod translation;
 
 use brush_mode::BrushModePlugin;
-use js_bridge::JSBridgePlugin;
-pub use js_bridge::{spawn_sphere_at_origin, test_sdf_evaluation};
+pub use command_bridge::spawn_sphere_at_origin;
+use command_bridge::CommandBridgePlugin;
 use mode::ModePlugin;
 pub use mode::{switch_to_brush_mode, switch_to_translate_mode, AppMode, AppModeState};
 use overlay::OverlayPlugin;
-use post_process::{PostProcessEntity, PostProcessPlugin, PostProcessSettings};
+use post_process::{PostProcessEnabled, PostProcessEntity, PostProcessPlugin, PostProcessSettings};
 use sdf_compute::SdfComputePlugin;
 use selection::SelectionPlugin;
 use translation::{DragData, Translatable, TranslationPlugin};
 
-use crate::selection::handle_selection;
+use crate::{command_bridge::spawn_sphere_at_pos, selection::handle_selection};
 
 #[derive(Resource)]
 struct AutoCloseTimer {
@@ -66,20 +66,16 @@ fn main() {
         .add_plugins(TranslationPlugin)
         .add_plugins(SdfComputePlugin)
         .add_plugins(BrushModePlugin)
-        .add_plugins(JSBridgePlugin)
+        .add_plugins(CommandBridgePlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, auto_close_system)
+        .add_systems(Update, (auto_close_system, toggle_post_process_system))
         .insert_resource(DragData::default())
         .insert_resource(AutoCloseTimer::new())
         .run();
 }
 
 // This system runs once at startup
-fn setup_system(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>, // Resource to store mesh data
-    mut materials: ResMut<Assets<StandardMaterial>>, // Resource to store material data)
-) {
+fn setup_system(mut commands: Commands) {
     // Add a 3D camera positioned to view the sphere
     // Add a camera
     commands.spawn((
@@ -109,61 +105,7 @@ fn setup_system(
         Transform::from_xyz(8.0, 16.0, 8.0),
     ));
 
-    // Spawn a red sphere with Translatable component
-    commands
-        .spawn((
-            Translatable,
-            PostProcessEntity,
-            Transform::from_xyz(0.0, 0.0, 0.0),
-            Mesh3d(meshes.add(Sphere {
-                radius: 1.,
-                ..default()
-            })),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgb(0.9, 0.2, 0.2),
-                ..default()
-            })),
-            GlobalTransform::default(),
-        ))
-        .observe(handle_selection);
-
-    // Spawn a blue sphere
-    commands
-        .spawn((
-            Mesh3d(meshes.add(Sphere {
-                radius: 1.,
-                ..default()
-            })),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgb(0.2, 0.2, 0.9),
-                ..default()
-            })),
-            Transform::from_xyz(2.0, 0.0, 0.0),
-            GlobalTransform::default(),
-            Translatable,
-            PostProcessEntity,
-        ))
-        .observe(handle_selection);
-
-    // Spawn a green sphere
-    commands
-        .spawn((
-            Mesh3d(meshes.add(Sphere {
-                radius: 1.,
-                ..default()
-            })),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgb(0.2, 0.9, 0.2),
-                ..default()
-            })),
-            Transform::from_xyz(-2.0, 0.0, 0.0),
-            GlobalTransform::default(),
-            Translatable,
-            PostProcessEntity,
-        ))
-        .observe(handle_selection);
-
-    // drag_paint observer is now added by BrushModePlugin
+    spawn_sphere_at_pos(Vec3::new(0., 0., 0.), 1.);
 }
 
 fn auto_close_system(
@@ -177,5 +119,15 @@ fn auto_close_system(
             info!("Auto-closing application after 15 seconds");
             exit.write(AppExit::Success);
         }
+    }
+}
+
+fn toggle_post_process_system(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut post_process_enabled: ResMut<PostProcessEnabled>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        post_process_enabled.enabled = !post_process_enabled.enabled;
+        info!("Post-process toggled: {}", post_process_enabled.enabled);
     }
 }
