@@ -93,6 +93,7 @@ impl Plugin for PostProcessPlugin {
         .add_systems(
             Update,
             (
+                sync_entity_positions,
                 collect_entity_transforms,
                 update_camera_settings,
                 update_entity_count_in_settings,
@@ -171,6 +172,14 @@ fn collect_entity_transforms(entity_query: Query<&PostProcessEntity>, mut comman
         .collect();
     // Send the data to the render world
     commands.insert_resource(EntityTransformData(transforms));
+}
+
+fn sync_entity_positions(
+    mut entity_query: Query<(&mut PostProcessEntity, &GlobalTransform), Changed<GlobalTransform>>,
+) {
+    for (mut entity, transform) in entity_query.iter_mut() {
+        entity.position = transform.translation();
+    }
 }
 
 // System that runs in the render world to update the buffer
