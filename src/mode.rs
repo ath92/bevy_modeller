@@ -23,7 +23,7 @@ impl Default for AppModeState {
     fn default() -> Self {
         let mut selection_enabled_modes = HashSet::new();
         selection_enabled_modes.insert(AppMode::Translate);
-        
+
         Self {
             current_mode: AppMode::Translate,
             selection_enabled_modes,
@@ -35,27 +35,22 @@ impl AppModeState {
     pub fn set_mode(&mut self, mode: AppMode) {
         self.current_mode = mode;
     }
-    
+
     pub fn is_mode(&self, mode: AppMode) -> bool {
         self.current_mode == mode
     }
-    
+
     pub fn is_selection_enabled(&self) -> bool {
         self.selection_enabled_modes.contains(&self.current_mode)
     }
-    
+
     pub fn enable_selection_for_mode(&mut self, mode: AppMode) {
         self.selection_enabled_modes.insert(mode);
     }
-    
+
     pub fn disable_selection_for_mode(&mut self, mode: AppMode) {
         self.selection_enabled_modes.remove(&mode);
     }
-}
-
-// System to handle mode switching
-pub fn switch_mode(mut mode_state: ResMut<AppModeState>, mode: AppMode) {
-    mode_state.set_mode(mode);
 }
 
 // Convenience functions for mode switching

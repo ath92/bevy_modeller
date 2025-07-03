@@ -5,8 +5,7 @@ use std::sync::LazyLock;
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
 use crate::mode::{AppMode, AppModeState};
-use crate::post_process::{PostProcessEnabled, PostProcessEntity};
-use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationSender};
+use crate::sdf_render::{SDFRenderEnabled, SDFRenderEntity};
 use crate::selection::handle_selection;
 use crate::translation::Translatable;
 
@@ -42,9 +41,6 @@ pub enum AppCommand {
         scale: f32,
         color: Color,
     },
-    EvaluateSdfCommand {
-        points: Vec<Vec3>,
-    },
     SetModeCommand {
         mode: String,
     },
@@ -62,9 +58,8 @@ pub fn process_app_commands(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     _camera: Query<(&Camera, &GlobalTransform)>,
-    sdf_sender: Res<SdfEvaluationSender>,
     mut mode_state: ResMut<AppModeState>,
-    mut post_process_enabled: ResMut<PostProcessEnabled>,
+    mut post_process_enabled: ResMut<SDFRenderEnabled>,
     mut entity_index_counter: ResMut<EntityIndexCounter>,
 ) {
     while let Some(cmd) = APP_COMMAND_QUEUE.pop() {
@@ -79,7 +74,7 @@ pub fn process_app_commands(
                 commands
                     .spawn((
                         Translatable,
-                        PostProcessEntity {
+                        SDFRenderEntity {
                             index,
                             position,
                             scale,
@@ -96,28 +91,6 @@ pub fn process_app_commands(
                         GlobalTransform::default(),
                     ))
                     .observe(handle_selection);
-            }
-            AppCommand::EvaluateSdfCommand { points } => {
-                let mut gpu_points: Vec<Vec2> = Vec::new();
-                for p in points {
-                    gpu_points.push(Vec2 { x: p.x, y: p.y });
-                }
-
-                // Clone the sender to move into the async task
-                let sender_clone = sdf_sender.clone();
-
-                // Spawn the future and handle results when ready
-                bevy::tasks::AsyncComputeTaskPool::get()
-                    .spawn(async move {
-                        let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await
-                        else {
-                            return;
-                        };
-                        for (i, result) in results.iter().enumerate() {
-                            info!("  Point {}: distance = {:.3}", i, result.distance);
-                        }
-                    })
-                    .detach();
             }
             AppCommand::SetModeCommand { mode } => {
                 match mode.as_str() {

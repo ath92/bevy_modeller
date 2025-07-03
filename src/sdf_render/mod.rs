@@ -26,17 +26,17 @@ use bevy::{
 };
 
 /// This example uses a shader source file from the assets subdirectory
-const SHADER_ASSET_PATH: &str = "shaders/post_processing.wgsl";
+const SHADER_ASSET_PATH: &str = "shaders/sdf_render.wgsl";
 
 // Resource to hold transform data in the render world
 #[derive(Resource)]
-pub struct EntityTransformBuffer {
+pub struct EntityBuffer {
     pub buffer: Option<Buffer>,
     pub data: Vec<Vec4>,
     pub capacity: usize,
 }
 
-impl Default for EntityTransformBuffer {
+impl Default for EntityBuffer {
     fn default() -> Self {
         Self {
             buffer: None,
@@ -48,7 +48,7 @@ impl Default for EntityTransformBuffer {
 
 // Component to mark entities whose transforms should be sent to the shader
 #[derive(Component)]
-pub struct PostProcessEntity {
+pub struct SDFRenderEntity {
     pub index: u32,
     pub position: Vec3,
     pub scale: f32,
@@ -56,10 +56,10 @@ pub struct PostProcessEntity {
 
 // Resource to transfer data from main world to render world
 #[derive(Resource, Clone)]
-struct EntityTransformData(Vec<Vec4>);
+struct EntityData(Vec<Vec4>);
 
-impl ExtractResource for EntityTransformData {
-    type Source = EntityTransformData;
+impl ExtractResource for EntityData {
+    type Source = EntityData;
 
     fn extract_resource(source: &Self::Source) -> Self {
         source.clone()
@@ -67,9 +67,9 @@ impl ExtractResource for EntityTransformData {
 }
 
 /// It is generally encouraged to set up post processing effects as a plugin
-pub struct PostProcessPlugin;
+pub struct SDFRenderPlugin;
 
-impl Plugin for PostProcessPlugin {
+impl Plugin for SDFRenderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             // The settings will be a component that lives in the main world but will
@@ -78,24 +78,24 @@ impl Plugin for PostProcessPlugin {
             // This plugin will take care of extracting it automatically.
             // It's important to derive [`ExtractComponent`] on [`PostProcessingSettings`]
             // for this plugin to work correctly.
-            ExtractComponentPlugin::<PostProcessSettings>::default(),
+            ExtractComponentPlugin::<SDFRenderSettings>::default(),
             // The settings will also be the data used in the shader.
             // This plugin will prepare the component for the GPU by creating a uniform buffer
             // and writing the data to that buffer every frame.
-            UniformComponentPlugin::<PostProcessSettings>::default(),
+            UniformComponentPlugin::<SDFRenderSettings>::default(),
             // Extract the EntityTransformData from main world to render world
-            ExtractResourcePlugin::<EntityTransformData>::default(),
+            ExtractResourcePlugin::<EntityData>::default(),
             // Extract the PostProcessEnabled flag from main world to render world
-            ExtractResourcePlugin::<PostProcessEnabled>::default(),
+            ExtractResourcePlugin::<SDFRenderEnabled>::default(),
         ))
         // Initialize the PostProcessEnabled resource
-        .init_resource::<PostProcessEnabled>()
+        .init_resource::<SDFRenderEnabled>()
         // Add the system to collect transform data
         .add_systems(
             Update,
             (
                 sync_entity_positions,
-                collect_entity_transforms,
+                collect_entity_data,
                 update_camera_settings,
                 update_entity_count_in_settings,
                 update_time_in_settings,
@@ -108,7 +108,7 @@ impl Plugin for PostProcessPlugin {
         };
 
         render_app
-            .init_resource::<EntityTransformBuffer>()
+            .init_resource::<EntityBuffer>()
             .add_systems(
                 Render,
                 (
@@ -131,11 +131,11 @@ impl Plugin for PostProcessPlugin {
             //
             // The [`ViewNodeRunner`] is a special [`Node`] that will automatically run the node for each view
             // matching the [`ViewQuery`]
-            .add_render_graph_node::<ViewNodeRunner<PostProcessNode>>(
+            .add_render_graph_node::<ViewNodeRunner<SDFRenderNode>>(
                 // Specify the label of the graph, in this case we want the graph for 3d
                 Core3d,
                 // It also needs the label of the node
-                PostProcessLabel,
+                SDFRenderLabel,
             )
             .add_render_graph_edges(
                 Core3d,
@@ -143,7 +143,7 @@ impl Plugin for PostProcessPlugin {
                 // This will automatically create all required node edges to enforce the given ordering.
                 (
                     Node3d::Tonemapping,
-                    PostProcessLabel,
+                    SDFRenderLabel,
                     Node3d::EndMainPassPostProcessing,
                 ),
             );
@@ -157,29 +157,29 @@ impl Plugin for PostProcessPlugin {
 
         render_app
             // Initialize the pipeline
-            .init_resource::<PostProcessPipeline>();
+            .init_resource::<SDFRenderPipeline>();
     }
 }
 
 // System that runs in the main world to collect transform data
-fn collect_entity_transforms(entity_query: Query<&PostProcessEntity>, mut commands: Commands) {
-    let mut entities: Vec<&PostProcessEntity> = entity_query.iter().collect();
+fn collect_entity_data(entity_query: Query<&SDFRenderEntity>, mut commands: Commands) {
+    let mut entities: Vec<&SDFRenderEntity> = entity_query.iter().collect();
     entities.sort_by_key(|e| e.index);
 
     let transforms: Vec<Vec4> = entities
         .iter()
         .map(|entity| {
             let translation = entity.position;
-            let scale = entity.scale; // Assume uniform scale, take x component
+            let scale = entity.scale;
             Vec4::new(translation.x, translation.y, translation.z, scale)
         })
         .collect();
     // Send the data to the render world
-    commands.insert_resource(EntityTransformData(transforms));
+    commands.insert_resource(EntityData(transforms));
 }
 
 fn sync_entity_positions(
-    mut entity_query: Query<(&mut PostProcessEntity, &GlobalTransform), Changed<GlobalTransform>>,
+    mut entity_query: Query<(&mut SDFRenderEntity, &GlobalTransform), Changed<GlobalTransform>>,
 ) {
     for (mut entity, transform) in entity_query.iter_mut() {
         entity.position = transform.translation();
@@ -188,8 +188,8 @@ fn sync_entity_positions(
 
 // System that runs in the render world to update the buffer
 fn update_transform_buffer(
-    mut transform_buffer: ResMut<EntityTransformBuffer>,
-    transform_data: Option<Res<EntityTransformData>>,
+    mut transform_buffer: ResMut<EntityBuffer>,
+    transform_data: Option<Res<EntityData>>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
 ) {
@@ -226,8 +226,8 @@ fn update_transform_buffer(
 
 // System to update entity count in main world settings
 fn update_entity_count_in_settings(
-    mut settings_query: Query<&mut PostProcessSettings>,
-    transform_data: Option<Res<EntityTransformData>>,
+    mut settings_query: Query<&mut SDFRenderSettings>,
+    transform_data: Option<Res<EntityData>>,
 ) {
     for mut settings in settings_query.iter_mut() {
         let entity_count = transform_data
@@ -241,8 +241,8 @@ fn update_entity_count_in_settings(
 
 // System to update entity count in render world settings
 fn update_render_world_entity_count(
-    mut settings_query: Query<&mut PostProcessSettings>,
-    transform_buffer: Option<Res<EntityTransformBuffer>>,
+    mut settings_query: Query<&mut SDFRenderSettings>,
+    transform_buffer: Option<Res<EntityBuffer>>,
 ) {
     for mut settings in settings_query.iter_mut() {
         let entity_count = transform_buffer
@@ -256,14 +256,14 @@ fn update_render_world_entity_count(
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub struct PostProcessLabel;
+pub struct SDFRenderLabel;
 
-// The post process node used for the render graph
+// The sdf render node used for the render graph
 #[derive(Default)]
-struct PostProcessNode;
+struct SDFRenderNode;
 
 // The ViewNode trait is required by the ViewNodeRunner
-impl ViewNode for PostProcessNode {
+impl ViewNode for SDFRenderNode {
     // The node needs a query to gather data from the ECS in order to do its rendering,
     // but it's not a normal system so we need to define it manually.
     //
@@ -272,11 +272,11 @@ impl ViewNode for PostProcessNode {
         &'static ViewTarget,
         // prepass textures
         &'static ViewPrepassTextures,
-        // This makes sure the node only runs on cameras with the PostProcessSettings component
-        &'static PostProcessSettings,
-        // As there could be multiple post processing components sent to the GPU (one per camera),
+        // This makes sure the node only runs on cameras with the SDFRenderSettings component
+        &'static SDFRenderSettings,
+        // As there could be multiple sdf render components sent to the GPU (one per camera),
         // we need to get the index of the one that is associated with the current view.
-        &'static DynamicUniformIndex<PostProcessSettings>,
+        &'static DynamicUniformIndex<SDFRenderSettings>,
     );
 
     // Runs the node logic
@@ -290,13 +290,13 @@ impl ViewNode for PostProcessNode {
         &self,
         _graph: &mut RenderGraphContext,
         render_context: &mut RenderContext,
-        (view_target, prepass_textures, _post_process_settings, settings_index): QueryItem<
+        (view_target, prepass_textures, _sdf_render_settings, settings_index): QueryItem<
             Self::ViewQuery,
         >,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        // Check if post processing is enabled, if not skip the entire pass
-        if let Some(enabled_resource) = world.get_resource::<PostProcessEnabled>() {
+        // Check if sdf rendering is enabled, if not skip the entire pass
+        if let Some(enabled_resource) = world.get_resource::<SDFRenderEnabled>() {
             if !enabled_resource.enabled {
                 return Ok(());
             }
@@ -304,8 +304,8 @@ impl ViewNode for PostProcessNode {
 
         // Get the pipeline resource that contains the global data we need
         // to create the render pipeline
-        let post_process_pipeline = world.resource::<PostProcessPipeline>();
-        let transform_buffer = world.resource::<EntityTransformBuffer>();
+        let sdf_render_pipeline = world.resource::<SDFRenderPipeline>();
+        let transform_buffer = world.resource::<EntityBuffer>();
 
         // The pipeline cache is a cache of all previously created pipelines.
         // It is required to avoid creating a new pipeline each frame,
@@ -313,10 +313,10 @@ impl ViewNode for PostProcessNode {
         let pipeline_cache = world.resource::<PipelineCache>();
 
         // Get the pipeline from the cache
-        let Some(pipeline) = pipeline_cache.get_render_pipeline(post_process_pipeline.pipeline_id)
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(sdf_render_pipeline.pipeline_id)
         else {
             let pipeline_state =
-                pipeline_cache.get_render_pipeline_state(post_process_pipeline.pipeline_id);
+                pipeline_cache.get_render_pipeline_state(sdf_render_pipeline.pipeline_id);
 
             match pipeline_state {
                 CachedPipelineState::Err(err) => {
@@ -328,7 +328,7 @@ impl ViewNode for PostProcessNode {
         };
 
         // Get the settings uniform binding
-        let settings_uniforms = world.resource::<ComponentUniforms<PostProcessSettings>>();
+        let settings_uniforms = world.resource::<ComponentUniforms<SDFRenderSettings>>();
         let Some(settings_binding) = settings_uniforms.uniforms().binding() else {
             info!("no settings binding");
             return Ok(());
@@ -351,7 +351,7 @@ impl ViewNode for PostProcessNode {
             return Ok(()); // Skip rendering if no transform buffer
         };
 
-        // This will start a new "post process write", obtaining two texture
+        // This will start a new "sdf render write", obtaining two texture
         // views from the view target - a `source` and a `destination`.
         // `source` is the "current" main texture and you _must_ write into
         // `destination` because calling `post_process_write()` on the
@@ -368,25 +368,25 @@ impl ViewNode for PostProcessNode {
         // The only way to have the correct source/destination for the bind_group
         // is to make sure you get it during the node execution.
         let bind_group = render_context.render_device().create_bind_group(
-            "post_process_bind_group",
-            &post_process_pipeline.layout,
+            "sdf_render_bind_group",
+            &sdf_render_pipeline.layout,
             // It's important for this to match the BindGroupLayout defined in the PostProcessPipeline
             &BindGroupEntries::sequential((
                 // Make sure to use the source view
                 post_process.source,
                 // Use the sampler created for the pipeline
-                &post_process_pipeline.sampler,
+                &sdf_render_pipeline.sampler,
                 // Depth
                 &depth_texture.texture.default_view,
                 // Depth sampler
-                &post_process_pipeline.depth_sampler,
+                &sdf_render_pipeline.depth_sampler,
             )),
         );
 
         // Create SDF scene bind group (group 1)
         let sdf_bind_group = render_context.render_device().create_bind_group(
             "sdf_scene_bind_group",
-            &post_process_pipeline.sdf_layout,
+            &sdf_render_pipeline.sdf_layout,
             &BindGroupEntries::sequential((
                 // SDF settings uniform (same as main settings)
                 settings_binding.clone(),
@@ -397,9 +397,9 @@ impl ViewNode for PostProcessNode {
 
         // Begin the render pass
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-            label: Some("post_process_pass"),
+            label: Some("sdf_render_pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                // We need to specify the post process destination view here
+                // We need to specify the sdf render destination view here
                 // to make sure we write to the appropriate texture.
                 view: post_process.destination,
                 resolve_target: None,
@@ -413,7 +413,7 @@ impl ViewNode for PostProcessNode {
         // This is mostly just wgpu boilerplate for drawing a fullscreen triangle,
         // using the pipeline/bind_group created above
         render_pass.set_render_pipeline(pipeline);
-        // By passing in the index of the post process settings on this view, we ensure
+        // By passing in the index of the sdf render settings on this view, we ensure
         // that in the event that multiple settings were sent to the GPU (as would be the
         // case with multiple cameras), we use the correct one.
         render_pass.set_bind_group(0, &bind_group, &[]);
@@ -426,7 +426,7 @@ impl ViewNode for PostProcessNode {
 
 // This contains global data used by the render pipeline. This will be created once on startup.
 #[derive(Resource)]
-struct PostProcessPipeline {
+struct SDFRenderPipeline {
     layout: BindGroupLayout,
     sdf_layout: BindGroupLayout,
     sampler: Sampler,
@@ -434,13 +434,13 @@ struct PostProcessPipeline {
     pipeline_id: CachedRenderPipelineId,
 }
 
-impl FromWorld for PostProcessPipeline {
+impl FromWorld for SDFRenderPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
 
         // We need to define the bind group layout used for our pipeline
         let layout = render_device.create_bind_group_layout(
-            "post_process_bind_group_layout",
+            "sdf_render_bind_group_layout",
             &BindGroupLayoutEntries::sequential(
                 // The layout entries will only be visible in the fragment stage
                 ShaderStages::FRAGMENT,
@@ -464,7 +464,7 @@ impl FromWorld for PostProcessPipeline {
                 ShaderStages::FRAGMENT,
                 (
                     // SDF settings uniform
-                    uniform_buffer::<PostProcessSettings>(true),
+                    uniform_buffer::<SDFRenderSettings>(true),
                     // Storage buffer for entity transforms
                     BindGroupLayoutEntry {
                         binding: 1,
@@ -491,7 +491,7 @@ impl FromWorld for PostProcessPipeline {
             .resource_mut::<PipelineCache>()
             // This will add the pipeline to the cache and queue its creation
             .queue_render_pipeline(RenderPipelineDescriptor {
-                label: Some("post_process_pipeline".into()),
+                label: Some("sdf_render_pipeline".into()),
                 layout: vec![layout.clone(), sdf_layout.clone()],
                 // This will setup a fullscreen triangle for the vertex state
                 vertex: fullscreen_shader_vertex_state(),
@@ -528,7 +528,7 @@ impl FromWorld for PostProcessPipeline {
 
 // This is the component that will get passed to the shader
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
-pub struct PostProcessSettings {
+pub struct SDFRenderSettings {
     pub near_plane: f32,
     pub far_plane: f32,
     pub view_matrix: Mat4,
@@ -540,36 +540,27 @@ pub struct PostProcessSettings {
 }
 
 #[derive(Resource, Clone)]
-pub struct PostProcessEnabled {
+pub struct SDFRenderEnabled {
     pub enabled: bool,
 }
 
-impl Default for PostProcessEnabled {
+impl Default for SDFRenderEnabled {
     fn default() -> Self {
         Self { enabled: true }
     }
 }
 
-impl PostProcessEnabled {
-    pub fn new(enabled: bool) -> Self {
-        Self { enabled }
-    }
-}
-
-impl ExtractResource for PostProcessEnabled {
-    type Source = PostProcessEnabled;
+impl ExtractResource for SDFRenderEnabled {
+    type Source = SDFRenderEnabled;
 
     fn extract_resource(source: &Self::Source) -> Self {
         source.clone()
     }
 }
 
-// System to update PostProcessSettings with current camera data
+// System to update SDFRenderSettings with current camera data
 fn update_camera_settings(
-    mut camera_query: Query<
-        (&mut PostProcessSettings, &GlobalTransform, &Projection),
-        With<Camera>,
-    >,
+    mut camera_query: Query<(&mut SDFRenderSettings, &GlobalTransform, &Projection), With<Camera>>,
 ) {
     for (mut settings, global_transform, projection) in camera_query.iter_mut() {
         // Update camera position
@@ -628,7 +619,7 @@ fn update_camera_settings(
 
 fn update_time_in_settings(
     time: Res<Time>,
-    mut camera_query: Query<&mut PostProcessSettings, With<Camera>>,
+    mut camera_query: Query<&mut SDFRenderSettings, With<Camera>>,
 ) {
     for mut settings in camera_query.iter_mut() {
         settings.time = time.elapsed().as_secs_f32();

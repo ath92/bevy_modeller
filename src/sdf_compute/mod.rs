@@ -85,7 +85,7 @@ impl Plugin for SdfComputePlugin {
                         .in_set(RenderSet::PrepareBindGroups)
                         .run_if(
                             resource_exists::<
-                                ComponentUniforms<crate::post_process::PostProcessSettings>,
+                                ComponentUniforms<crate::sdf_render::SDFRenderSettings>,
                             >,
                         ),
                     process_sdf_requests.before(RenderSet::Render),
@@ -159,8 +159,8 @@ fn prepare_sdf_bind_groups(
     pipeline: Res<SdfComputePipeline>,
     render_device: Res<RenderDevice>,
     buffers: Res<SdfComputeBuffers>,
-    entity_buffer: Res<crate::post_process::EntityTransformBuffer>,
-    settings_uniforms: Res<ComponentUniforms<crate::post_process::PostProcessSettings>>,
+    entity_buffer: Res<crate::sdf_render::EntityBuffer>,
+    settings_uniforms: Res<ComponentUniforms<crate::sdf_render::SDFRenderSettings>>,
 ) {
     // Bind group 0: compute-specific resources (query points and results)
     let compute_bind_group = render_device.create_bind_group(
@@ -223,7 +223,7 @@ impl FromWorld for SdfComputePipeline {
                 ShaderStages::COMPUTE,
                 (
                     // PostProcessSettings uniform
-                    uniform_buffer::<crate::post_process::PostProcessSettings>(true),
+                    uniform_buffer::<crate::sdf_render::SDFRenderSettings>(true),
                     // Entity transforms storage buffer
                     storage_buffer_read_only::<Mat4>(false),
                 ),

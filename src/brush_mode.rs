@@ -86,7 +86,7 @@ fn drag_paint(
                 let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await else {
                     return;
                 };
-                for (i, result) in results.iter().enumerate() {
+                for (_, result) in results.iter().enumerate() {
                     let new_sphere_radius = 0.1;
                     let pos = ray.get_point(result.distance - new_sphere_radius);
 

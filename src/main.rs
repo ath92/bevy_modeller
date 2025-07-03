@@ -8,8 +8,8 @@ mod brush_mode;
 mod command_bridge;
 mod mode;
 mod overlay;
-mod post_process;
 mod sdf_compute;
+mod sdf_render;
 mod selection;
 mod translation;
 
@@ -19,12 +19,12 @@ use command_bridge::CommandBridgePlugin;
 use mode::ModePlugin;
 pub use mode::{switch_to_brush_mode, switch_to_translate_mode, AppMode, AppModeState};
 use overlay::OverlayPlugin;
-use post_process::{PostProcessEnabled, PostProcessEntity, PostProcessPlugin, PostProcessSettings};
 use sdf_compute::SdfComputePlugin;
+use sdf_render::{SDFRenderEnabled, SDFRenderPlugin, SDFRenderSettings};
 use selection::SelectionPlugin;
-use translation::{DragData, Translatable, TranslationPlugin};
+use translation::{DragData, TranslationPlugin};
 
-use crate::{command_bridge::spawn_sphere_at_pos, selection::handle_selection};
+use crate::command_bridge::spawn_sphere_at_pos;
 
 #[derive(Resource)]
 struct AutoCloseTimer {
@@ -56,7 +56,7 @@ fn main() {
                 }),
                 ..default()
             }),
-            PostProcessPlugin,
+            SDFRenderPlugin,
         ))
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(MeshPickingPlugin)
@@ -68,7 +68,7 @@ fn main() {
         .add_plugins(BrushModePlugin)
         .add_plugins(CommandBridgePlugin)
         .add_systems(Startup, setup_system)
-        .add_systems(Update, (auto_close_system, toggle_post_process_system))
+        .add_systems(Update, (auto_close_system, toggle_sdf_render_system))
         .insert_resource(DragData::default())
         .insert_resource(AutoCloseTimer::new())
         .run();
@@ -83,7 +83,7 @@ fn setup_system(mut commands: Commands) {
             order: 0,
             ..default()
         },
-        PostProcessSettings {
+        SDFRenderSettings {
             near_plane: 0.1,
             far_plane: 10.,
             ..default()
@@ -122,12 +122,12 @@ fn auto_close_system(
     }
 }
 
-fn toggle_post_process_system(
+fn toggle_sdf_render_system(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut post_process_enabled: ResMut<PostProcessEnabled>,
+    mut sdf_render_enabled: ResMut<SDFRenderEnabled>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyP) {
-        post_process_enabled.enabled = !post_process_enabled.enabled;
-        info!("Post-process toggled: {}", post_process_enabled.enabled);
+        sdf_render_enabled.enabled = !sdf_render_enabled.enabled;
+        info!("Post-process toggled: {}", sdf_render_enabled.enabled);
     }
 }
