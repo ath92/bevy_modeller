@@ -34,7 +34,6 @@ pub struct SdfResult {
 #[derive(Debug)]
 pub struct SdfEvaluationRequest {
     pub points: Vec<Vec2>,
-    pub id: u64,
     pub response_tx: oneshot::Sender<Vec<SdfResult>>,
 }
 
@@ -57,9 +56,6 @@ pub struct GpuVec3 {
     pub z: f32,
     pub _padding: f32, // Padding to align to 16 bytes
 }
-
-/// Global counter for request IDs
-static REQUEST_ID_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Plugin for SDF compute functionality
 pub struct SdfComputePlugin;
@@ -486,12 +482,9 @@ pub async fn evaluate_sdf_async(
     points: Vec<Vec2>,
     sender: &SdfEvaluationSender,
 ) -> Result<Vec<SdfResult>, oneshot::Canceled> {
-    let id = REQUEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-
     let (response_tx, response_rx) = oneshot::channel();
     let request = SdfEvaluationRequest {
         points,
-        id,
         response_tx,
     };
 
