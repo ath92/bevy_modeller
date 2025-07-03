@@ -259,8 +259,6 @@ struct PendingSdfRequests {
     ready_for_mapping: Vec<SdfEvaluationRequest>,
 }
 
-
-
 fn process_sdf_requests(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
@@ -283,7 +281,6 @@ fn process_sdf_requests(
 
         // Resize buffers if needed
         if points_count > buffers.current_capacity {
-            info!("new buffers");
             let new_capacity = (points_count * 2).max(1024);
 
             buffers.query_points_buffer = render_device.create_buffer(&BufferDescriptor {
@@ -329,10 +326,6 @@ fn initiate_gpu_readback(mut pending_requests: ResMut<PendingSdfRequests>) {
 
     // Move completed requests to ready_for_mapping queue for delayed processing
     if !pending_requests.completed_requests.is_empty() {
-        info!(
-            "Marking {} requests ready for mapping",
-            pending_requests.completed_requests.len()
-        );
         let requests_to_map: Vec<_> = pending_requests.completed_requests.drain(..).collect();
         pending_requests.ready_for_mapping.extend(requests_to_map);
     }
@@ -350,7 +343,7 @@ fn perform_delayed_readback(
             Some(_) => {
                 // Take the request to process it
                 let (request, _) = pending_requests.pending_mapping.take().unwrap();
-                
+
                 // Read the data - wrap in a closure to ensure cleanup on error
                 let read_result = (|| -> Result<Vec<SdfResult>, &'static str> {
                     let buffer_slice = buffers.readback_buffer.slice(..);
@@ -364,7 +357,7 @@ fn perform_delayed_readback(
                         let bytes: [u8; RESULT_SIZE] = chunk
                             .try_into()
                             .map_err(|_| "Failed to convert chunk to byte array")?;
-                        info!("{:?}", bytes);
+
                         results_data.push(bytemuck::from_bytes::<SdfResult>(&bytes).clone());
                     }
 
@@ -373,8 +366,6 @@ fn perform_delayed_readback(
 
                 // Always unmap the buffer regardless of success/failure
                 buffers.readback_buffer.unmap();
-
-                info!("Sending results for request ID: {}", request.id);
 
                 // Send results through oneshot channel
                 match read_result {
@@ -395,12 +386,8 @@ fn perform_delayed_readback(
     }
 
     // Start a new mapping if we have no pending mapping and requests are ready
-    if pending_requests.pending_mapping.is_none() && !pending_requests.ready_for_mapping.is_empty() {
-        info!(
-            "Starting GPU readback for 1 of {} ready requests",
-            pending_requests.ready_for_mapping.len()
-        );
-
+    if pending_requests.pending_mapping.is_none() && !pending_requests.ready_for_mapping.is_empty()
+    {
         // Process one request at a time to minimize GPU impact
         let request = pending_requests.ready_for_mapping.remove(0);
 
@@ -460,7 +447,9 @@ impl render_graph::Node for SdfComputeNode {
 
                 // Dispatch workgroups based on pending requests
                 let pending_requests = world.resource::<PendingSdfRequests>();
-                if !pending_requests.requests.is_empty() && pending_requests.pending_mapping.is_none() {
+                if !pending_requests.requests.is_empty()
+                    && pending_requests.pending_mapping.is_none()
+                {
                     let max_points = pending_requests
                         .requests
                         .iter()
@@ -498,11 +487,6 @@ pub async fn evaluate_sdf_async(
     sender: &SdfEvaluationSender,
 ) -> Result<Vec<SdfResult>, oneshot::Canceled> {
     let id = REQUEST_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    // info!(
-    //     "Sending SDF evaluation request with ID: {} for {} points",
-    //     id,
-    //     points.len()
-    // );
 
     let (response_tx, response_rx) = oneshot::channel();
     let request = SdfEvaluationRequest {

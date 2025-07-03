@@ -31,12 +31,10 @@ fn setup_brush_mode_observers(
     if mode_state.is_mode(AppMode::Brush) {
         let observer = commands.spawn(Observer::new(drag_paint)).id();
         observer_state.drag_observer = Some(observer);
-        info!("Spawned brush mode observers");
     } else {
         // Mode is not brush - despawn observers if active
         if let Some(observer_entity) = observer_state.drag_observer.take() {
             commands.entity(observer_entity).despawn();
-            info!("Despawned brush mode observers");
         }
     }
 }
@@ -58,7 +56,6 @@ fn drag_paint(
     sdf_sender: Res<SdfEvaluationSender>,
     camera_query: Query<(&Camera, &GlobalTransform, &OverlayCamera)>,
 ) {
-    info!("drag paint");
     // do something on drag
     let viewport_position = trigger.pointer_location.position;
 
@@ -79,7 +76,6 @@ fn drag_paint(
             x: viewport_position.x / width,
             y: viewport_position.y / height,
         });
-        info!("Starting SDF evaluation for {} points", gpu_points.len());
 
         // Clone the sender to move into the async task
         let sender_clone = sdf_sender.clone();
@@ -90,11 +86,10 @@ fn drag_paint(
                 let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await else {
                     return;
                 };
-                info!("SDF Evaluation Results:");
                 for (i, result) in results.iter().enumerate() {
                     let new_sphere_radius = 0.1;
                     let pos = ray.get_point(result.distance - new_sphere_radius);
-                    info!("{:?}", pos);
+
                     spawn_sphere_at_pos(pos, new_sphere_radius);
                 }
             })

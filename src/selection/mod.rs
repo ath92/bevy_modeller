@@ -42,7 +42,6 @@ pub fn handle_selection(
         return;
     }
 
-    info!("something");
     // Get entity from pointer interactions
     let entity = click.target();
 

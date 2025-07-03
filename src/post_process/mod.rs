@@ -49,6 +49,7 @@ impl Default for EntityTransformBuffer {
 // Component to mark entities whose transforms should be sent to the shader
 #[derive(Component)]
 pub struct PostProcessEntity {
+    pub index: u32,
     pub position: Vec3,
     pub scale: f32,
 }
@@ -162,7 +163,10 @@ impl Plugin for PostProcessPlugin {
 
 // System that runs in the main world to collect transform data
 fn collect_entity_transforms(entity_query: Query<&PostProcessEntity>, mut commands: Commands) {
-    let transforms: Vec<Vec4> = entity_query
+    let mut entities: Vec<&PostProcessEntity> = entity_query.iter().collect();
+    entities.sort_by_key(|e| e.index);
+
+    let transforms: Vec<Vec4> = entities
         .iter()
         .map(|entity| {
             let translation = entity.position;
@@ -200,6 +204,7 @@ fn update_transform_buffer(
 
     // Create or resize buffer if needed
     if transform_buffer.buffer.is_none() || transform_buffer.capacity < data_size {
+        info!("resize transform buffer");
         transform_buffer.capacity = (data_size * 2).max(1024); // Buffer with some extra space
 
         transform_buffer.buffer = Some(render_device.create_buffer(&BufferDescriptor {
@@ -415,7 +420,6 @@ impl ViewNode for PostProcessNode {
         render_pass.set_bind_group(1, &sdf_bind_group, &[settings_index.index()]);
         render_pass.draw(0..3, 0..1);
 
-        info!("post process render");
         Ok(())
     }
 }

@@ -110,8 +110,10 @@ fn combine_sphere_into_scene_result(
         result.distance = sphere_distance;
     } else {
         // Combine with existing result using smooth minimum
-        result.distance = circular_geometrical_smin(current_result.distance, sphere_distance, smoothing_factor);
+        result.distance = quadratic_smin(current_result.distance, sphere_distance, smoothing_factor);
     }
+
+    // result.distance -= abs(sin(sdf_settings.time)) * 0.01;
 
     return result;
 }

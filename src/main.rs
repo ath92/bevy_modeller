@@ -116,7 +116,7 @@ fn auto_close_system(
     if timer.enabled {
         timer.timer.tick(time.delta());
         if timer.timer.finished() {
-            info!("Auto-closing application after 15 seconds");
+            info!("Auto-closing application after some seconds");
             exit.write(AppExit::Success);
         }
     }

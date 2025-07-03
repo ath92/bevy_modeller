@@ -67,8 +67,6 @@ pub enum TranslationAxis {
 fn on_add_translatable(trigger: Trigger<OnAdd, Translatable>, mut commands: Commands) {
     let target = trigger.target();
 
-    info!("added translatable");
-
     let mut select_observer = Observer::new(on_select_translatable);
     let mut deselect_observer = Observer::new(on_deselect_translatable);
 

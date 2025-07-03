@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use crossbeam_queue::SegQueue;
+
 use std::sync::LazyLock;
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
 
@@ -9,11 +10,23 @@ use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationSender};
 use crate::selection::handle_selection;
 use crate::translation::Translatable;
 
+#[derive(Resource)]
+pub struct EntityIndexCounter {
+    pub counter: u32,
+}
+
+impl Default for EntityIndexCounter {
+    fn default() -> Self {
+        Self { counter: 0 }
+    }
+}
+
 pub struct CommandBridgePlugin;
 
 impl Plugin for CommandBridgePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (process_app_commands, monitor_mode_changes));
+        app.init_resource::<EntityIndexCounter>()
+            .add_systems(Update, (process_app_commands, monitor_mode_changes));
     }
 }
 
@@ -52,6 +65,7 @@ pub fn process_app_commands(
     sdf_sender: Res<SdfEvaluationSender>,
     mut mode_state: ResMut<AppModeState>,
     mut post_process_enabled: ResMut<PostProcessEnabled>,
+    mut entity_index_counter: ResMut<EntityIndexCounter>,
 ) {
     while let Some(cmd) = APP_COMMAND_QUEUE.pop() {
         match cmd {
@@ -60,10 +74,16 @@ pub fn process_app_commands(
                 color,
                 scale,
             } => {
+                let index = entity_index_counter.counter;
+                entity_index_counter.counter += 1;
                 commands
                     .spawn((
                         Translatable,
-                        PostProcessEntity { position, scale },
+                        PostProcessEntity {
+                            index,
+                            position,
+                            scale,
+                        },
                         Transform::from_translation(position),
                         Mesh3d(meshes.add(Sphere {
                             radius: scale,
@@ -82,28 +102,22 @@ pub fn process_app_commands(
                 for p in points {
                     gpu_points.push(Vec2 { x: p.x, y: p.y });
                 }
-                info!("Starting SDF evaluation for {} points", gpu_points.len());
 
                 // Clone the sender to move into the async task
                 let sender_clone = sdf_sender.clone();
 
                 // Spawn the future and handle results when ready
-                info!("Spawning async task for SDF evaluation");
                 bevy::tasks::AsyncComputeTaskPool::get()
                     .spawn(async move {
-                        info!("Async task started, waiting for SDF results...");
                         let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await
                         else {
                             return;
                         };
-                        info!("SDF Evaluation Results received!");
                         for (i, result) in results.iter().enumerate() {
                             info!("  Point {}: distance = {:.3}", i, result.distance);
                         }
-                        info!("SDF evaluation task completed successfully!");
                     })
                     .detach();
-                info!("Async task spawned and detached");
             }
             AppCommand::SetModeCommand { mode } => {
                 match mode.as_str() {
@@ -117,7 +131,6 @@ pub fn process_app_commands(
             }
             AppCommand::SetPostProcessEnabledCommand { enabled } => {
                 post_process_enabled.enabled = enabled;
-                info!("Post-process enabled set to: {}", enabled);
             }
         }
     }
