@@ -1,6 +1,7 @@
 use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, window::WindowResolution};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use iyes_perf_ui::{prelude::PerfUiDefaultEntries, PerfUiPlugin};
 use rand::Rng;
 use std::env;
 use std::time::Duration;
@@ -58,7 +59,12 @@ fn main() {
                 ..default()
             }),
             SDFRenderPlugin,
+            PerfUiPlugin,
         ))
+        .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
+        .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
+        .add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(MeshPickingPlugin)
         .add_plugins(ModePlugin)
@@ -118,6 +124,8 @@ fn setup_system(mut commands: Commands) {
             0.5,
         );
     }
+
+    commands.spawn(PerfUiDefaultEntries::default());
 }
 
 fn auto_close_system(

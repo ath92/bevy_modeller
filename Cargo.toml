@@ -25,6 +25,7 @@ web-sys = { version = "0.3.74", features = [
 ] }
 bevy_panorbit_camera = "0.26.0"
 rand = "0.9.1"
+iyes_perf_ui = "0.5.0"
 
 # Enable optimizations for dependencies (but not for our code):
 [profile.dev.package."*"]
