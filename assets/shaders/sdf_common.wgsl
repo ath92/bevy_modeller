@@ -57,7 +57,7 @@ fn init_scene_sdf_result(point: vec3<f32>, steps: i32) -> SceneSdfResult {
 // Default raymarching configuration
 fn default_raymarch_config() -> RaymarchConfig {
     var config: RaymarchConfig;
-    config.max_steps = 64;
+    config.max_steps = 48;
     config.max_distance = 50.0;
     config.surface_threshold = 0.01;
     return config;

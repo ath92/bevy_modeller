@@ -168,8 +168,31 @@ impl Plugin for SDFRenderPlugin {
 }
 
 // System that runs in the main world to collect transform data
-fn collect_entity_data(entity_query: Query<&SDFRenderEntity>, mut commands: Commands) {
-    let mut entities: Vec<&SDFRenderEntity> = entity_query.iter().collect();
+fn collect_entity_data(
+    changed_entities: Query<&SDFRenderEntity, Changed<SDFRenderEntity>>,
+    all_entities: Query<&SDFRenderEntity>,
+    mut commands: Commands,
+    entity_data: Option<Res<EntityData>>,
+) {
+    // Check if we need to collect data
+    let needs_update = if entity_data.is_none() {
+        // First time - collect all entities
+        true
+    } else {
+        // Only update if entities have changed
+        !changed_entities.is_empty()
+    };
+
+    if !needs_update {
+        return;
+    }
+
+    info!(
+        "Collecting entity data - {} entities",
+        all_entities.iter().count()
+    );
+
+    let mut entities: Vec<&SDFRenderEntity> = all_entities.iter().collect();
     entities.sort_by_key(|e| e.index);
 
     let transforms: Vec<Vec4> = entities
@@ -203,6 +226,13 @@ fn update_transform_buffer(
         info!("no data");
         return;
     };
+
+    // Only update if the data has changed
+    if !data.is_changed() {
+        return;
+    }
+
+    info!("Updating entity buffer - {} entities", data.0.len());
 
     // Update our CPU-side data
     transform_buffer.data = data.0.clone();
