@@ -21,10 +21,11 @@ struct RaymarchConfig {
 struct SceneSdfResult {
     distance: f32,
     position: vec3<f32>,
+    steps: i32,
 }
 
 // Settings structure (must match Rust side)
-struct PostProcessSettings {
+struct SDFRenderSettings {
     near_plane: f32,
     far_plane: f32,
     view_matrix: mat4x4<f32>,
@@ -33,19 +34,23 @@ struct PostProcessSettings {
     entity_count: u32,
     inverse_view_projection: mat4x4<f32>,
     time: f32,
+    coarse_resolution_factor: f32,
+    coarse_distance_multiplier: f32,
+    coarse_max_steps: u32,
 }
 
 // Dedicated bind group for SDF scene data (Group 1)
 // This allows the common functions to access scene data directly
 // without needing pointer parameters, and keeps indexing consistent across shaders
-@group(1) @binding(0) var<uniform> sdf_settings: PostProcessSettings;
+@group(1) @binding(0) var<uniform> sdf_settings: SDFRenderSettings;
 @group(1) @binding(1) var<storage, read> entities: array<vec4<f32>>;
 
 // Initialize a scene SDF result with default values
-fn init_scene_sdf_result(point: vec3<f32>) -> SceneSdfResult {
+fn init_scene_sdf_result(point: vec3<f32>, steps: i32) -> SceneSdfResult {
     var result: SceneSdfResult;
     result.distance = 999999.0; // Large initial distance
     result.position = point;
+    result.steps = steps;
     return result;
 }
 
@@ -109,6 +114,9 @@ fn combine_sphere_into_scene_result(
         // First sphere - just use its values
         result.distance = sphere_distance;
     } else {
+        if (sphere_distance > sphere_radius + sphere_radius * smoothing_factor) {
+            result.distance = min(current_result.distance, sphere_distance);
+        }
         // Combine with existing result using smooth minimum
         result.distance = quadratic_smin(current_result.distance, sphere_distance, smoothing_factor);
     }
@@ -119,8 +127,8 @@ fn combine_sphere_into_scene_result(
 }
 
 // Evaluate SDF at a specific point using the scene data from the dedicated bind group
-fn evaluate_scene_sdf(point: vec3<f32>) -> SceneSdfResult {
-    var result = init_scene_sdf_result(point);
+fn evaluate_scene_sdf(point: vec3<f32>, steps: i32) -> SceneSdfResult {
+    var result = init_scene_sdf_result(point, steps);
     let smoothing_factor = 0.5; // Adjust for more/less blending
 
     for (var i = 0u; i < sdf_settings.entity_count; i++) {
@@ -148,12 +156,12 @@ fn evaluate_scene_sdf(point: vec3<f32>) -> SceneSdfResult {
 fn calculate_normal(point: vec3<f32>) -> vec3<f32> {
     let epsilon = 0.001;
     let normal = vec3<f32>(
-        evaluate_scene_sdf(point + vec3<f32>(epsilon, 0.0, 0.0)).distance -
-        evaluate_scene_sdf(point - vec3<f32>(epsilon, 0.0, 0.0)).distance,
-        evaluate_scene_sdf(point + vec3<f32>(0.0, epsilon, 0.0)).distance -
-        evaluate_scene_sdf(point - vec3<f32>(0.0, epsilon, 0.0)).distance,
-        evaluate_scene_sdf(point + vec3<f32>(0.0, 0.0, epsilon)).distance -
-        evaluate_scene_sdf(point - vec3<f32>(0.0, 0.0, epsilon)).distance
+        evaluate_scene_sdf(point + vec3<f32>(epsilon, 0.0, 0.0), 0).distance -
+        evaluate_scene_sdf(point - vec3<f32>(epsilon, 0.0, 0.0), 0).distance,
+        evaluate_scene_sdf(point + vec3<f32>(0.0, epsilon, 0.0), 0).distance -
+        evaluate_scene_sdf(point - vec3<f32>(0.0, epsilon, 0.0), 0).distance,
+        evaluate_scene_sdf(point + vec3<f32>(0.0, 0.0, epsilon), 0).distance -
+        evaluate_scene_sdf(point - vec3<f32>(0.0, 0.0, epsilon), 0).distance
     );
     return normalize(normal);
 }
@@ -194,16 +202,54 @@ fn get_inverse_view_projection() -> mat4x4<f32> {
     return sdf_settings.inverse_view_projection;
 }
 
+// Get coarse pass settings
+fn get_coarse_max_steps() -> u32 {
+    return sdf_settings.coarse_max_steps;
+}
+
+fn get_coarse_distance_multiplier() -> f32 {
+    return sdf_settings.coarse_distance_multiplier;
+}
+
 fn raymarch(uv: vec2<f32>, ray_origin: vec3<f32>, config: RaymarchConfig) -> SceneSdfResult {
     // Ray direction using actual camera matrices
     let ray_dir = get_ray_direction(uv, get_inverse_view_projection());
 
     var ray_pos = ray_origin;
-    var total_distance = 0.0;
+    var total_distance = 0.001;
 
     // Raymarching loop
     for (var step = 0; step < config.max_steps; step++) {
-        let sdf_result = evaluate_scene_sdf(ray_pos);
+        let sdf_result = evaluate_scene_sdf(ray_pos, step);
+
+        // If we're close enough to a surface, we've hit something
+        if (sdf_result.distance < config.surface_threshold) {
+            return sdf_result;
+        }
+
+        // If we've traveled too far, we haven't hit anything
+        if (total_distance > config.max_distance) {
+            break;
+        }
+
+        // March along the ray
+        ray_pos += ray_dir * sdf_result.distance;
+        total_distance += sdf_result.distance;
+    }
+
+    var result: SceneSdfResult;
+    result.distance = config.max_distance;
+    result.position = ray_pos;
+    return result;
+}
+
+fn raymarch_from_position(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: RaymarchConfig) -> SceneSdfResult {
+    var ray_pos = start_pos;
+    var total_distance = 0.0;
+
+    // Raymarching loop starting from given position
+    for (var step = 0; step < config.max_steps; step++) {
+        let sdf_result = evaluate_scene_sdf(ray_pos, step);
 
         // If we're close enough to a surface, we've hit something
         if (sdf_result.distance < config.surface_threshold) {

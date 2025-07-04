@@ -128,6 +128,7 @@ pub fn spawn_sphere_at_pos(pos: Vec3, scale: f32) {
 
 // System to monitor mode changes and dispatch JavaScript events
 pub fn monitor_mode_changes(mode_state: Res<AppModeState>) {
+    #[cfg(target_arch = "wasm32")]
     if mode_state.is_changed() {
         let mode_name = match mode_state.current_mode {
             AppMode::Translate => "Translate",

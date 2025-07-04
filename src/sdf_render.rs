@@ -76,7 +76,7 @@ impl Plugin for SDFRenderPlugin {
             // be extracted to the render world every frame.
             // This makes it possible to control the effect from the main world.
             // This plugin will take care of extracting it automatically.
-            // It's important to derive [`ExtractComponent`] on [`PostProcessingSettings`]
+            // It's important to derive [`ExtractComponent`] on [`SDFRenderSettings`]
             // for this plugin to work correctly.
             ExtractComponentPlugin::<SDFRenderSettings>::default(),
             // The settings will also be the data used in the shader.
@@ -112,6 +112,7 @@ impl Plugin for SDFRenderPlugin {
             .add_systems(
                 Render,
                 (
+                    manage_coarse_pass_texture.in_set(RenderSet::PrepareResources),
                     update_transform_buffer.in_set(RenderSet::PrepareResources),
                     update_render_world_entity_count
                         .in_set(RenderSet::PrepareResources)
@@ -131,6 +132,10 @@ impl Plugin for SDFRenderPlugin {
             //
             // The [`ViewNodeRunner`] is a special [`Node`] that will automatically run the node for each view
             // matching the [`ViewQuery`]
+            .add_render_graph_node::<ViewNodeRunner<SDFCoarsePrepassNode>>(
+                Core3d,
+                SDFCoarsePrepassLabel,
+            )
             .add_render_graph_node::<ViewNodeRunner<SDFRenderNode>>(
                 // Specify the label of the graph, in this case we want the graph for 3d
                 Core3d,
@@ -139,10 +144,10 @@ impl Plugin for SDFRenderPlugin {
             )
             .add_render_graph_edges(
                 Core3d,
-                // Specify the node ordering.
-                // This will automatically create all required node edges to enforce the given ordering.
+                // Specify the node ordering: Tonemapping -> Coarse Prepass -> Main SDF -> End
                 (
                     Node3d::Tonemapping,
+                    SDFCoarsePrepassLabel,
                     SDFRenderLabel,
                     Node3d::EndMainPassPostProcessing,
                 ),
@@ -156,8 +161,9 @@ impl Plugin for SDFRenderPlugin {
         };
 
         render_app
-            // Initialize the pipeline
-            .init_resource::<SDFRenderPipeline>();
+            // Initialize the pipelines
+            .init_resource::<SDFRenderPipeline>()
+            .init_resource::<SDFCoarsePrepassPipeline>();
     }
 }
 
@@ -258,9 +264,16 @@ fn update_render_world_entity_count(
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 pub struct SDFRenderLabel;
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+pub struct SDFCoarsePrepassLabel;
+
 // The sdf render node used for the render graph
 #[derive(Default)]
 struct SDFRenderNode;
+
+// The coarse pre-pass render node
+#[derive(Default)]
+struct SDFCoarsePrepassNode;
 
 // The ViewNode trait is required by the ViewNodeRunner
 impl ViewNode for SDFRenderNode {
@@ -367,6 +380,12 @@ impl ViewNode for SDFRenderNode {
         // The reason it doesn't work is because each post_process_write will alternate the source/destination.
         // The only way to have the correct source/destination for the bind_group
         // is to make sure you get it during the node execution.
+        // Get the coarse pass texture
+        let Some(coarse_texture) = world.get_resource::<CoarsePassTexture>() else {
+            info!("no coarse texture");
+            return Ok(());
+        };
+
         let bind_group = render_context.render_device().create_bind_group(
             "sdf_render_bind_group",
             &sdf_render_pipeline.layout,
@@ -380,6 +399,10 @@ impl ViewNode for SDFRenderNode {
                 &depth_texture.texture.default_view,
                 // Depth sampler
                 &sdf_render_pipeline.depth_sampler,
+                // Coarse pass texture
+                &coarse_texture.view,
+                // Coarse pass sampler
+                &sdf_render_pipeline.coarse_sampler,
             )),
         );
 
@@ -424,6 +447,113 @@ impl ViewNode for SDFRenderNode {
     }
 }
 
+impl ViewNode for SDFCoarsePrepassNode {
+    type ViewQuery = (
+        &'static ViewPrepassTextures,
+        &'static SDFRenderSettings,
+        &'static DynamicUniformIndex<SDFRenderSettings>,
+    );
+
+    fn run(
+        &self,
+        _graph: &mut RenderGraphContext,
+        render_context: &mut RenderContext,
+        (prepass_textures, _sdf_render_settings, settings_index): QueryItem<Self::ViewQuery>,
+        world: &World,
+    ) -> Result<(), NodeRunError> {
+        // Check if sdf rendering is enabled
+        if let Some(enabled_resource) = world.get_resource::<SDFRenderEnabled>() {
+            if !enabled_resource.enabled {
+                return Ok(());
+            }
+        }
+
+        let coarse_pipeline = world.resource::<SDFCoarsePrepassPipeline>();
+        let transform_buffer = world.resource::<EntityBuffer>();
+        let pipeline_cache = world.resource::<PipelineCache>();
+
+        let Some(pipeline) = pipeline_cache.get_render_pipeline(coarse_pipeline.pipeline_id) else {
+            return Ok(());
+        };
+
+        let settings_uniforms = world.resource::<ComponentUniforms<SDFRenderSettings>>();
+        let Some(settings_binding) = settings_uniforms.uniforms().binding() else {
+            return Ok(());
+        };
+
+        let Some(depth_texture) = &prepass_textures.depth else {
+            return Ok(());
+        };
+
+        let Some(transform_binding) = transform_buffer
+            .buffer
+            .as_ref()
+            .map(|b| b.as_entire_binding())
+        else {
+            return Ok(());
+        };
+
+        let Some(coarse_texture) = world.get_resource::<CoarsePassTexture>() else {
+            return Ok(());
+        };
+
+        // Create a dummy screen texture view for the coarse pass
+        let dummy_texture = render_context
+            .render_device()
+            .create_texture(&TextureDescriptor {
+                label: Some("dummy_screen_texture"),
+                size: Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+        let dummy_view = dummy_texture.create_view(&TextureViewDescriptor::default());
+
+        let bind_group = render_context.render_device().create_bind_group(
+            "sdf_coarse_prepass_bind_group",
+            &coarse_pipeline.layout,
+            &BindGroupEntries::sequential((
+                &dummy_view,
+                &coarse_pipeline.sampler,
+                &depth_texture.texture.default_view,
+                &coarse_pipeline.depth_sampler,
+            )),
+        );
+
+        let sdf_bind_group = render_context.render_device().create_bind_group(
+            "sdf_coarse_scene_bind_group",
+            &coarse_pipeline.sdf_layout,
+            &BindGroupEntries::sequential((settings_binding.clone(), transform_binding)),
+        );
+
+        let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
+            label: Some("sdf_coarse_prepass"),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: &coarse_texture.view,
+                resolve_target: None,
+                ops: Operations::default(),
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        render_pass.set_render_pipeline(pipeline);
+        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_bind_group(1, &sdf_bind_group, &[settings_index.index()]);
+        render_pass.draw(0..3, 0..1);
+
+        Ok(())
+    }
+}
+
 // This contains global data used by the render pipeline. This will be created once on startup.
 #[derive(Resource)]
 struct SDFRenderPipeline {
@@ -431,6 +561,7 @@ struct SDFRenderPipeline {
     sdf_layout: BindGroupLayout,
     sampler: Sampler,
     depth_sampler: Sampler,
+    coarse_sampler: Sampler,
     pipeline_id: CachedRenderPipelineId,
 }
 
@@ -453,6 +584,10 @@ impl FromWorld for SDFRenderPipeline {
                     texture_2d(TextureSampleType::Depth),
                     // The depth sampler
                     sampler(SamplerBindingType::NonFiltering),
+                    // The coarse pass texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    // The coarse pass sampler
+                    sampler(SamplerBindingType::Filtering),
                 ),
             ),
         );
@@ -483,6 +618,7 @@ impl FromWorld for SDFRenderPipeline {
         // We can create the sampler here since it won't change at runtime and doesn't depend on the view
         let sampler = render_device.create_sampler(&SamplerDescriptor::default());
         let depth_sampler = render_device.create_sampler(&SamplerDescriptor { ..default() });
+        let coarse_sampler = render_device.create_sampler(&SamplerDescriptor::default());
 
         // Get the shader handle
         let shader = world.load_asset(SHADER_ASSET_PATH);
@@ -521,13 +657,108 @@ impl FromWorld for SDFRenderPipeline {
             sdf_layout,
             sampler,
             depth_sampler,
+            coarse_sampler,
+            pipeline_id,
+        }
+    }
+}
+
+#[derive(Resource)]
+struct SDFCoarsePrepassPipeline {
+    layout: BindGroupLayout,
+    sdf_layout: BindGroupLayout,
+    sampler: Sampler,
+    depth_sampler: Sampler,
+    pipeline_id: CachedRenderPipelineId,
+}
+
+impl FromWorld for SDFCoarsePrepassPipeline {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+
+        // Bind group layout for coarse pre-pass (similar to main pass)
+        let layout = render_device.create_bind_group_layout(
+            "sdf_coarse_prepass_bind_group_layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    // The screen texture
+                    texture_2d(TextureSampleType::Float { filterable: true }),
+                    // The sampler that will be used to sample the screen texture
+                    sampler(SamplerBindingType::Filtering),
+                    // The depth texture
+                    texture_2d(TextureSampleType::Depth),
+                    // The depth sampler
+                    sampler(SamplerBindingType::NonFiltering),
+                ),
+            ),
+        );
+
+        // Separate bind group layout for SDF scene data (group 1) - reuse from main pass
+        let sdf_layout = render_device.create_bind_group_layout(
+            "sdf_coarse_scene_bind_group_layout",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::FRAGMENT,
+                (
+                    // SDF settings uniform
+                    uniform_buffer::<SDFRenderSettings>(true),
+                    // Storage buffer for entity transforms
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ),
+            ),
+        );
+
+        let sampler = render_device.create_sampler(&SamplerDescriptor::default());
+        let depth_sampler = render_device.create_sampler(&SamplerDescriptor { ..default() });
+
+        // Get the coarse pre-pass shader handle
+        let shader = world.load_asset("shaders/sdf_coarse_prepass.wgsl");
+
+        let pipeline_id =
+            world
+                .resource_mut::<PipelineCache>()
+                .queue_render_pipeline(RenderPipelineDescriptor {
+                    label: Some("sdf_coarse_prepass_pipeline".into()),
+                    layout: vec![layout.clone(), sdf_layout.clone()],
+                    vertex: fullscreen_shader_vertex_state(),
+                    fragment: Some(FragmentState {
+                        shader,
+                        shader_defs: vec![],
+                        entry_point: "fragment".into(),
+                        targets: vec![Some(ColorTargetState {
+                            format: TextureFormat::R32Float,
+                            blend: None,
+                            write_mask: ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: PrimitiveState::default(),
+                    depth_stencil: None,
+                    multisample: MultisampleState::default(),
+                    push_constant_ranges: vec![],
+                    zero_initialize_workgroup_memory: false,
+                });
+
+        Self {
+            layout,
+            sdf_layout,
+            sampler,
+            depth_sampler,
             pipeline_id,
         }
     }
 }
 
 // This is the component that will get passed to the shader
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Clone, Copy, ExtractComponent, ShaderType)]
 pub struct SDFRenderSettings {
     pub near_plane: f32,
     pub far_plane: f32,
@@ -537,6 +768,34 @@ pub struct SDFRenderSettings {
     pub entity_count: u32,
     pub inverse_view_projection: Mat4,
     pub time: f32,
+    pub coarse_resolution_factor: f32,
+    pub coarse_distance_multiplier: f32,
+    pub coarse_max_steps: u32,
+}
+
+impl Default for SDFRenderSettings {
+    fn default() -> Self {
+        Self {
+            near_plane: 0.1,
+            far_plane: 1000.0,
+            view_matrix: Mat4::IDENTITY,
+            projection_matrix: Mat4::IDENTITY,
+            camera_position: Vec3::ZERO,
+            entity_count: 0,
+            inverse_view_projection: Mat4::IDENTITY,
+            time: 0.0,
+            coarse_resolution_factor: 0.0625, // 1/16 resolution
+            coarse_distance_multiplier: 16.0, // 25x higher threshold
+            coarse_max_steps: 16,             // Reduced steps for performance
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct CoarsePassTexture {
+    pub texture: Texture,
+    pub view: TextureView,
+    pub size: Extent3d,
 }
 
 #[derive(Resource, Clone)]
@@ -623,5 +882,59 @@ fn update_time_in_settings(
 ) {
     for mut settings in camera_query.iter_mut() {
         settings.time = time.elapsed().as_secs_f32();
+    }
+}
+
+fn manage_coarse_pass_texture(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    coarse_texture: Option<ResMut<CoarsePassTexture>>,
+    camera_query: Query<&SDFRenderSettings, With<Camera>>,
+) {
+    // Get the first camera's settings to determine texture size
+    let Ok(settings) = camera_query.single() else {
+        return;
+    };
+
+    // Calculate coarse texture size based on resolution factor
+    // For now, use a base size - this should be updated based on actual viewport size
+    let base_width = 1920u32;
+    let base_height = 1080u32;
+    let coarse_width = (base_width as f32 * settings.coarse_resolution_factor) as u32;
+    let coarse_height = (base_height as f32 * settings.coarse_resolution_factor) as u32;
+
+    let desired_size = Extent3d {
+        width: coarse_width.max(1),
+        height: coarse_height.max(1),
+        depth_or_array_layers: 1,
+    };
+
+    // Check if we need to create or recreate the texture
+    let needs_update = match &coarse_texture {
+        Some(existing) => existing.size != desired_size,
+        None => true,
+    };
+
+    if needs_update {
+        let texture = render_device.create_texture(&TextureDescriptor {
+            label: Some("sdf_coarse_pass_texture"),
+            size: desired_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::R32Float,
+            usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+
+        let view = texture.create_view(&TextureViewDescriptor::default());
+
+        let new_coarse_texture = CoarsePassTexture {
+            texture,
+            view,
+            size: desired_size,
+        };
+
+        commands.insert_resource(new_coarse_texture);
     }
 }
