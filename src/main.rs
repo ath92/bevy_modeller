@@ -1,6 +1,7 @@
 use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, window::WindowResolution};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use rand::Rng;
 use std::env;
 use std::time::Duration;
 
@@ -105,7 +106,18 @@ fn setup_system(mut commands: Commands) {
         Transform::from_xyz(8.0, 16.0, 8.0),
     ));
 
-    spawn_sphere_at_pos(Vec3::new(0., 0., 0.), 1.);
+    let mut rng = rand::rng();
+    for i in 0..100 {
+        info!("spanw {:?}", i);
+        spawn_sphere_at_pos(
+            Vec3::new(
+                rng.random_range(-5.0..5.0),
+                rng.random_range(-5.0..5.0),
+                rng.random_range(-5.0..5.0),
+            ),
+            0.5,
+        );
+    }
 }
 
 fn auto_close_system(
