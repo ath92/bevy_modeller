@@ -31,7 +31,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let ray_dir = get_ray_direction(uv, get_inverse_view_projection());
 
     // Start raymarching from coarse distance
-    let start_pos = ray_origin + ray_dir * (coarse_distance * 0.8);
+    let start_pos = ray_origin + ray_dir * (coarse_distance);
 
     // Perform fine raymarching starting from the coarse position
     let result = raymarch_from_position(start_pos, ray_dir, config);

@@ -238,7 +238,7 @@ fn raymarch(uv: vec2<f32>, ray_origin: vec3<f32>, config: RaymarchConfig) -> Sce
     }
 
     var result: SceneSdfResult;
-    result.distance = config.max_distance;
+    result.distance = total_distance;
     result.position = ray_pos;
     return result;
 }
