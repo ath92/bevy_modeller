@@ -25,6 +25,14 @@ use bevy::{
     },
 };
 
+use bvh::bounding_hierarchy::{BHShape, BoundingHierarchy};
+use bvh::{
+    aabb::{Aabb, Bounded},
+    bvh::Bvh,
+};
+use bytemuck::Pod;
+use nalgebra::{Point3, Vector3};
+
 /// This example uses a shader source file from the assets subdirectory
 const SHADER_ASSET_PATH: &str = "shaders/sdf_render.wgsl";
 
@@ -33,6 +41,14 @@ const SHADER_ASSET_PATH: &str = "shaders/sdf_render.wgsl";
 pub struct EntityBuffer {
     pub buffer: Option<Buffer>,
     pub data: Vec<Vec4>,
+    pub capacity: usize,
+}
+
+// Buffer for BVH data
+#[derive(Resource)]
+pub struct BVHBuffer {
+    pub buffer: Option<Buffer>,
+    pub data: Vec<BVHNode>,
     pub capacity: usize,
 }
 
@@ -46,17 +62,80 @@ impl Default for EntityBuffer {
     }
 }
 
+impl Default for BVHBuffer {
+    fn default() -> Self {
+        Self {
+            buffer: None,
+            data: Vec::new(),
+            capacity: 0,
+        }
+    }
+}
+
 // Component to mark entities whose transforms should be sent to the shader
-#[derive(Component)]
+#[derive(Component, Clone, Debug, PartialEq)]
 pub struct SDFRenderEntity {
-    pub index: u32,
+    pub node_index: usize,
     pub position: Vec3,
     pub scale: f32,
+}
+
+impl Bounded<f32, 3> for SDFRenderEntity {
+    fn aabb(&self) -> Aabb<f32, 3> {
+        let half_size = self.scale * 3.; // add .5 for smoothing factor - parameterize this?
+        let half_size_v3 = Vector3::new(half_size, half_size, half_size);
+        let pos = Point3::new(self.position.x, self.position.y, self.position.z);
+        let min = pos - half_size_v3;
+        let max = pos + half_size_v3;
+        Aabb::with_bounds(min, max)
+    }
+}
+
+impl BHShape<f32, 3> for SDFRenderEntity {
+    fn set_bh_node_index(&mut self, index: usize) {
+        self.node_index = index;
+    }
+
+    fn bh_node_index(&self) -> usize {
+        self.node_index
+    }
 }
 
 // Resource to transfer data from main world to render world
 #[derive(Resource, Clone)]
 struct EntityData(Vec<Vec4>);
+
+#[repr(C)]
+#[derive(Clone, Pod, bytemuck::Zeroable, std::marker::Copy, Debug)]
+pub struct BVHNode {
+    min: Vec4,
+    max: Vec4,
+    entry_index: u32,
+    exit_index: u32,
+    shape_index: u32,
+    __padding: u32,
+}
+
+// Resource for flattened BVH
+#[derive(Resource, Clone)]
+struct FlattenedBVH(Vec<BVHNode>);
+
+impl FromWorld for FlattenedBVH {
+    fn from_world(_: &mut World) -> Self {
+        let v: Vec<BVHNode> = Vec::new();
+        Self(v)
+    }
+}
+
+impl ExtractResource for FlattenedBVH {
+    type Source = FlattenedBVH;
+
+    fn extract_resource(source: &Self::Source) -> Self {
+        // Create a new FlattenedBVH with the same data
+        // Since FlatNode doesn't implement Clone, we need to rebuild it
+        source.clone()
+    }
+}
 
 impl ExtractResource for EntityData {
     type Source = EntityData;
@@ -87,9 +166,13 @@ impl Plugin for SDFRenderPlugin {
             ExtractResourcePlugin::<EntityData>::default(),
             // Extract the PostProcessEnabled flag from main world to render world
             ExtractResourcePlugin::<SDFRenderEnabled>::default(),
+            // Extract the FlattenedBVH from main world to render world
+            ExtractResourcePlugin::<FlattenedBVH>::default(),
         ))
         // Initialize the PostProcessEnabled resource
         .init_resource::<SDFRenderEnabled>()
+        // Initialize the FlattenedBVH resource
+        .init_resource::<FlattenedBVH>()
         // Add the system to collect transform data
         .add_systems(
             Update,
@@ -99,6 +182,7 @@ impl Plugin for SDFRenderPlugin {
                 update_camera_settings,
                 update_entity_count_in_settings,
                 update_time_in_settings,
+                build_entity_bvh.after(collect_entity_data),
             ),
         );
 
@@ -109,6 +193,9 @@ impl Plugin for SDFRenderPlugin {
 
         render_app
             .init_resource::<EntityBuffer>()
+            // BVH
+            .init_resource::<FlattenedBVH>()
+            .init_resource::<BVHBuffer>()
             .add_systems(
                 Render,
                 (
@@ -119,19 +206,10 @@ impl Plugin for SDFRenderPlugin {
                         .after(update_transform_buffer),
                 ),
             )
-            // Bevy's renderer uses a render graph which is a collection of nodes in a directed acyclic graph.
-            // It currently runs on each view/camera and executes each node in the specified order.
-            // It will make sure that any node that needs a dependency from another node
-            // only runs when that dependency is done.
-            //
-            // Each node can execute arbitrary work, but it generally runs at least one render pass.
-            // A node only has access to the render world, so if you need data from the main world
-            // you need to extract it manually or with the plugin like above.
-            // Add a [`Node`] to the [`RenderGraph`]
-            // The Node needs to impl FromWorld
-            //
-            // The [`ViewNodeRunner`] is a special [`Node`] that will automatically run the node for each view
-            // matching the [`ViewQuery`]
+            .add_systems(
+                Render,
+                update_bvh_buffer.in_set(RenderSet::PrepareResources),
+            )
             .add_render_graph_node::<ViewNodeRunner<SDFCoarsePrepassNode>>(
                 Core3d,
                 SDFCoarsePrepassLabel,
@@ -163,6 +241,7 @@ impl Plugin for SDFRenderPlugin {
         render_app
             // Initialize the pipelines
             .init_resource::<SDFRenderPipeline>()
+            .init_resource::<FlattenedBVH>()
             .init_resource::<SDFCoarsePrepassPipeline>();
     }
 }
@@ -193,7 +272,7 @@ fn collect_entity_data(
     );
 
     let mut entities: Vec<&SDFRenderEntity> = all_entities.iter().collect();
-    entities.sort_by_key(|e| e.index);
+    entities.sort_by_key(|e| e.node_index);
 
     let transforms: Vec<Vec4> = entities
         .iter()
@@ -205,6 +284,118 @@ fn collect_entity_data(
         .collect();
     // Send the data to the render world
     commands.insert_resource(EntityData(transforms));
+}
+
+fn gpu_friendly_f32(f: f32) -> f32 {
+    if f == f32::INFINITY {
+        return 99999999.;
+    } else if f == f32::NEG_INFINITY {
+        return -99999999.;
+    }
+    f
+}
+
+// System that runs in the main world to collect transform data
+fn build_entity_bvh(mut commands: Commands, entity_data: ResMut<EntityData>) {
+    if !entity_data.is_changed() {
+        return;
+    }
+
+    let entities: Vec<Vec4> = entity_data.into_inner().to_owned().0;
+    info!("Building BVH for {} entities", entities.len());
+
+    let mut sdf_entities: Vec<SDFRenderEntity> = entities
+        .iter()
+        .enumerate()
+        .map(|(i, v)| SDFRenderEntity {
+            position: Vec3::new(v.x, v.y, v.z),
+            scale: v.w,
+            node_index: i,
+        })
+        .collect();
+
+    info!("{:?} sdf entities", sdf_entities);
+
+    let bvh = Bvh::build_par(&mut sdf_entities);
+
+    let flat = bvh.flatten();
+
+    let as_bvh_nodes = flat
+        .iter()
+        .map(|n| BVHNode {
+            min: Vec4::new(
+                gpu_friendly_f32(n.aabb.min.x),
+                gpu_friendly_f32(n.aabb.min.y),
+                gpu_friendly_f32(n.aabb.min.z),
+                0.,
+            ),
+            max: Vec4::new(
+                gpu_friendly_f32(n.aabb.max.x),
+                gpu_friendly_f32(n.aabb.max.y),
+                gpu_friendly_f32(n.aabb.max.z),
+                0.,
+            ),
+            entry_index: n.entry_index,
+            exit_index: n.exit_index,
+            shape_index: n.shape_index,
+            __padding: 0,
+        })
+        .collect();
+
+    commands.insert_resource(FlattenedBVH(as_bvh_nodes));
+}
+
+fn update_bvh_buffer(
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    mut bvh_buffer: ResMut<BVHBuffer>,
+    flattened_bvh: Res<FlattenedBVH>,
+) {
+    if !flattened_bvh.is_changed() {
+        return;
+    }
+
+    let bvh_data = &flattened_bvh.0;
+
+    bvh_buffer.data = bvh_data.clone();
+    let byte_size = bvh_buffer.data.len() * std::mem::size_of::<BVHNode>();
+
+    // Debug: Log first few BVH nodes
+    for (i, node) in bvh_data.iter().take(50).enumerate() {
+        info!(
+            "BVH Node {}: type={}, entry={}, exit={}, shape={}, aabb=({:.2},{:.2},{:.2})-({:.2},{:.2},{:.2})",
+            i,
+            if node.shape_index != u32::MAX { "leaf" } else { "internal" },
+            node.entry_index,
+            node.exit_index,
+            node.shape_index,
+            node.min.x, node.min.y, node.min.z,
+            node.max.x, node.max.y, node.max.z
+        );
+    }
+
+    // Create or recreate buffer if needed
+    if bvh_buffer.buffer.is_none() || bvh_buffer.capacity < byte_size {
+        bvh_buffer.capacity = byte_size.max(1024); // Minimum 1KB
+        bvh_buffer.buffer = Some(render_device.create_buffer(&BufferDescriptor {
+            label: Some("bvh_buffer"),
+            size: bvh_buffer.capacity as u64,
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }));
+        info!(
+            "Created BVH buffer with capacity: {} bytes",
+            bvh_buffer.capacity
+        );
+    }
+
+    // Update buffer data
+    if let Some(buffer) = &bvh_buffer.buffer {
+        if !bvh_buffer.data.is_empty() {
+            render_queue.write_buffer(buffer, 0, bytemuck::cast_slice(&bvh_buffer.data));
+            info!("Updated BVH buffer with {} BVHnodes", bvh_buffer.data.len());
+        }
+    }
 }
 
 fn sync_entity_positions(
@@ -349,6 +540,7 @@ impl ViewNode for SDFRenderNode {
         // to create the render pipeline
         let sdf_render_pipeline = world.resource::<SDFRenderPipeline>();
         let transform_buffer = world.resource::<EntityBuffer>();
+        let bvh_buffer = world.resource::<BVHBuffer>();
 
         // The pipeline cache is a cache of all previously created pipelines.
         // It is required to avoid creating a new pipeline each frame,
@@ -394,6 +586,14 @@ impl ViewNode for SDFRenderNode {
             return Ok(()); // Skip rendering if no transform buffer
         };
 
+        // Get BVH buffer binding, or create empty buffer if none exists
+        let bvh_buffer_binding = bvh_buffer.buffer.as_ref().map(|b| b.as_entire_binding());
+
+        let Some(bvh_binding) = bvh_buffer_binding else {
+            info!("no bvh binding");
+            return Ok(()); // Skip rendering if no BVH buffer
+        };
+
         // This will start a new "sdf render write", obtaining two texture
         // views from the view target - a `source` and a `destination`.
         // `source` is the "current" main texture and you _must_ write into
@@ -419,15 +619,10 @@ impl ViewNode for SDFRenderNode {
         let bind_group = render_context.render_device().create_bind_group(
             "sdf_render_bind_group",
             &sdf_render_pipeline.layout,
-            // It's important for this to match the BindGroupLayout defined in the PostProcessPipeline
             &BindGroupEntries::sequential((
-                // Make sure to use the source view
                 post_process.source,
-                // Use the sampler created for the pipeline
                 &sdf_render_pipeline.sampler,
-                // Depth
                 &depth_texture.texture.default_view,
-                // Depth sampler
                 &sdf_render_pipeline.depth_sampler,
                 // Coarse pass texture
                 &coarse_texture.view,
@@ -445,6 +640,8 @@ impl ViewNode for SDFRenderNode {
                 settings_binding.clone(),
                 // Transform storage buffer
                 transform_binding,
+                // BVH storage buffer
+                bvh_binding,
             )),
         );
 
@@ -633,6 +830,17 @@ impl FromWorld for SDFRenderPipeline {
                     // Storage buffer for entity transforms
                     BindGroupLayoutEntry {
                         binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    // Storage buffer for BVH data
+                    BindGroupLayoutEntry {
+                        binding: 2,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Storage { read_only: true },

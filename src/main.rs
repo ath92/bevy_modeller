@@ -112,18 +112,26 @@ fn setup_system(mut commands: Commands) {
         Transform::from_xyz(8.0, 16.0, 8.0),
     ));
 
-    let mut rng = rand::rng();
-    for i in 0..100 {
-        info!("spanw {:?}", i);
-        spawn_sphere_at_pos(
-            Vec3::new(
-                rng.random_range(-5.0..5.0),
-                rng.random_range(-5.0..5.0),
-                rng.random_range(-5.0..5.0),
-            ),
-            0.5,
-        );
-    }
+    // let mut rng = rand::rng();
+    // for i in 0..100 {
+    //     info!("spanw {:?}", i);
+    //     spawn_sphere_at_pos(
+    //         Vec3::new(
+    //             rng.random_range(-2.0..2.0),
+    //             rng.random_range(-2.0..2.0),
+    //             rng.random_range(-2.0..2.0),
+    //         ),
+    //         0.2,
+    //     );
+    // }
+    spawn_sphere_at_pos(
+        Vec3 {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        },
+        1.,
+    );
 
     commands.spawn(PerfUiDefaultEntries::default());
 }

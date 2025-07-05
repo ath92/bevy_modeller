@@ -11,7 +11,7 @@ use crate::translation::Translatable;
 
 #[derive(Resource)]
 pub struct EntityIndexCounter {
-    pub counter: u32,
+    pub counter: usize,
 }
 
 impl Default for EntityIndexCounter {
@@ -75,7 +75,7 @@ pub fn process_app_commands(
                     .spawn((
                         Translatable,
                         SDFRenderEntity {
-                            index,
+                            node_index: index,
                             position,
                             scale,
                         },
