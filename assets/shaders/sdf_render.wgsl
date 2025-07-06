@@ -35,8 +35,7 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
 
     // Perform fine raymarching starting from the coarse position with BVH acceleration
     let result = raymarch_from_position_bvh(start_pos, ray_origin, ray_dir, config);
-
-    let num_candidates = bvh_count_candidates(ray_origin, ray_dir);
+    // let result = raymarch_from_position(start_pos, ray_dir, config);
 
     let total_dist = result.distance + length(result.position - start_pos);
 
@@ -49,5 +48,5 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(diffuse, diffuse, diffuse, 1.0);
     }
 
-    return vec4<f32>(1. - f32(num_candidates) / 64., 0.0, 0.0, 1.0);
+    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
 }
