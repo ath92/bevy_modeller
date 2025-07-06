@@ -248,11 +248,6 @@ fn evaluate_scene_sdf_with_bvh(point: vec3<f32>, ray_origin: vec3<f32>, ray_dir:
     var result = init_scene_sdf_result(point, steps);
     let smoothing_factor = 0.5; // Adjust for more/less blending
 
-    // Fallback to regular evaluation if BVH is empty
-    if (arrayLength(&bvh_nodes) == 0u) {
-        return evaluate_scene_sdf(point, steps);
-    }
-
     // Use BVH to get candidate entities
     let candidates = bvh_traverse_for_entities(ray_origin, ray_dir);
 
