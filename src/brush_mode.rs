@@ -10,64 +10,34 @@ pub struct BrushModePlugin;
 
 impl Plugin for BrushModePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BrushModeObserverState>()
-            .add_systems(Startup, setup_brush_mode_observers)
-            .add_systems(Update, handle_mode_change_for_brush);
-    }
-}
-
-// Resource to track brush mode observer entities
-#[derive(Resource, Default)]
-pub struct BrushModeObserverState {
-    pub drag_observer: Option<Entity>,
-}
-
-// System to set up brush mode observers based on initial mode
-fn setup_brush_mode_observers(
-    mut commands: Commands,
-    mode_state: Res<AppModeState>,
-    mut observer_state: ResMut<BrushModeObserverState>,
-) {
-    if mode_state.is_mode(AppMode::Brush) {
-        let observer = commands.spawn(Observer::new(drag_paint)).id();
-        observer_state.drag_observer = Some(observer);
-    } else {
-        // Mode is not brush - despawn observers if active
-        if let Some(observer_entity) = observer_state.drag_observer.take() {
-            commands.entity(observer_entity).despawn();
-        }
+        app.add_systems(Update, handle_click_brush);
     }
 }
 
 // System to handle mode changes for brush mode
-fn handle_mode_change_for_brush(
-    commands: Commands,
+fn handle_click_brush(
     mode_state: Res<AppModeState>,
-    observer_state: ResMut<BrushModeObserverState>,
-) {
-    if mode_state.is_changed() {
-        setup_brush_mode_observers(commands, mode_state, observer_state);
-    }
-}
-
-fn drag_paint(
-    trigger: Trigger<Pointer<Click>>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    buttons: Res<ButtonInput<MouseButton>>,
     sdf_sender: Res<SdfEvaluationSender>,
     camera_query: Query<(&Camera, &GlobalTransform, &OverlayCamera)>,
 ) {
-    // do something on drag
-    let viewport_position = trigger.pointer_location.position;
-
-    let Ok((camera, camera_transform, _)) = camera_query.single() else {
+    if !mode_state.is_mode(AppMode::Brush) {
         return;
-    };
+    }
+    if buttons.just_pressed(MouseButton::Left) {
+        info!("drag paint");
+        let Some(viewport_position) = window.cursor_position() else {
+            return;
+        };
+        let Ok((camera, camera_transform, _)) = camera_query.single() else {
+            return;
+        };
 
-    let Ok(ray) = camera.viewport_to_world(camera_transform, viewport_position) else {
-        return;
-    };
+        let Ok(ray) = camera.viewport_to_world(camera_transform, viewport_position) else {
+            return;
+        };
 
-    if let Ok(window) = window_query.single() {
         let width = window.resolution.width();
         let height = window.resolution.height();
 
