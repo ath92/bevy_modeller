@@ -1,5 +1,5 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
-#import "shaders/sdf_common.wgsl"::{PostProcessSettings, SceneSdfResult, RaymarchConfig, default_raymarch_config, calculate_normal, raymarch, get_camera_position, get_ray_direction, get_inverse_view_projection, raymarch_from_position, raymarch_from_position_bvh, bvh_count_candidates}
+#import "shaders/sdf_common.wgsl"::{PostProcessSettings, SceneSdfResult, RaymarchConfig, default_raymarch_config, calculate_normal, raymarch, get_camera_position, get_ray_direction, get_inverse_view_projection, raymarch_from_position, raymarch_from_position_bvh}
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
 @group(0) @binding(1) var texture_sampler: sampler;

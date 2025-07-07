@@ -338,10 +338,11 @@ fn build_entity_bvh(mut commands: Commands, entity_data: ResMut<EntityData>) {
             entry_index: n.entry_index,
             exit_index: n.exit_index,
             shape_index: n.shape_index,
-            __padding: 0,
+            __padding: n.shape_index,
         })
         .collect();
 
+    info!("BVH NODESSSSSSSSS {:?}", as_bvh_nodes);
     commands.insert_resource(FlattenedBVH(as_bvh_nodes));
 }
 
