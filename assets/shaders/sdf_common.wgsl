@@ -32,6 +32,7 @@ struct SDFRenderSettings {
     projection_matrix: mat4x4<f32>,
     camera_position: vec3<f32>,
     entity_count: u32,
+    num_bvh_nodes: u32,
     inverse_view_projection: mat4x4<f32>,
     time: f32,
     coarse_resolution_factor: f32,
@@ -175,7 +176,7 @@ fn ray_aabb_intersect(ray_origin: vec3<f32>, ray_dir: vec3<f32>, aabb_min: vec3<
     return t_near <= t_far && t_far >= 0.0;
 }
 
-// BVH traversal to find entities that might intersect with the ray
+// Linear BVH traversal following the reference implementation
 fn bvh_traverse_for_entities(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> array<u32, 64> {
     var candidate_entities: array<u32, 64>;
     // Initialize array with invalid indices
@@ -184,48 +185,32 @@ fn bvh_traverse_for_entities(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> array
     }
     var candidate_count = 0u;
 
-    // Guard against empty BVH
-    if (arrayLength(&bvh_nodes) == 0u) {
-        return candidate_entities;
-    }
+    var index = 0u;
+    let max_length = sdf_settings.num_bvh_nodes;
 
-    // Simple stack-based traversal
-    var stack: array<u32, 32>;
-    var stack_top = 0u;
+    // Iterate while the node index is valid
+    while (index < max_length && candidate_count < 64u) {
+        let node = bvh_nodes[index];
+        let shape_index = node.shape_index;
 
-    // Start with root node (index 0)
-    stack[0] = 0u;
-    stack_top = 1u;
-
-    while (stack_top > 0u && candidate_count < 64u) {
-        stack_top -= 1u;
-        let node_index = stack[stack_top];
-
-        let aabb_min = bvh_nodes[node_index].min.xyz;
-        let aabb_max = bvh_nodes[node_index].max.xyz;
-        let shape_index = bvh_nodes[node_index].shape_index;
-
-        // Test ray against AABB
-        if (shape_index < 0xFFFFFFFFu) { // u32::MAX
-            // Leaf node - add the entity referenced by shape_index
+        if (shape_index < 0xFFFFFFFFu) { // u32::MAX - leaf node
+            // Add the entity to candidates
             candidate_entities[candidate_count] = shape_index;
             candidate_count += 1u;
-        } else if (ray_aabb_intersect(ray_origin, ray_dir, aabb_min, aabb_max)) {
-            // Internal node - add children to stack
-            let left_child = bvh_nodes[node_index].entry_index;
-            let right_child = bvh_nodes[node_index].exit_index;
 
-            if (stack_top < 30u) {
-                stack[stack_top] = left_child;
-                stack[stack_top + 1u] = right_child;
-                stack_top += 2u;
-            }
+            // Exit the current node
+            index = node.exit_index;
+        } else if (ray_aabb_intersect(ray_origin, ray_dir, node.min.xyz, node.max.xyz)) {
+            // If AABB test passes, proceed to entry_index (go down the BVH branch)
+            index = node.entry_index;
+        } else {
+            // If AABB test fails, proceed to exit_index (skip this subtree)
+            index = node.exit_index;
         }
     }
 
     return candidate_entities;
 }
-
 
 // Combine a sphere into the existing scene result with smooth blending
 fn combine_sphere_into_scene_result(
@@ -254,7 +239,7 @@ fn combine_sphere_into_scene_result(
 // Evaluate SDF at a specific point using BVH acceleration
 fn evaluate_scene_sdf_with_bvh(point: vec3<f32>, candidates: array<u32, 64>, steps: i32) -> SceneSdfResult {
     var result = init_scene_sdf_result(point, steps);
-    let smoothing_factor = 0.1; // Adjust for more/less blending
+    let smoothing_factor = 0.5; // Adjust for more/less blending
 
     var processed_any = false;
     for (var i = 0u; i < 64u; i++) {
@@ -274,7 +259,7 @@ fn evaluate_scene_sdf_with_bvh(point: vec3<f32>, candidates: array<u32, 64>, ste
             point,
             sphere_center,
             sphere_radius,
-            smoothing_factor,
+            smoothing_factor * sphere_radius,
             !processed_any
         );
 
@@ -370,31 +355,14 @@ fn raymarch_from_position(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: Raym
     return result;
 }
 
-fn bvh_traverse_regarded() -> array<u32, 64> {
-    var candidate_entities: array<u32, 64>;
-    // Initialize array with invalid indices
-    for (var i = 0u; i < 64u; i++) {
-        candidate_entities[i] = 0xFFFFFFFFu;
-    }
-    var count = 0u;
-    for (var i = 0u; i < 1u; i++) {
-        let shape_index= bvh_nodes[i].shape_index;
-        if (shape_index < 0xFFFFFFFFu) {
-            candidate_entities[count] = shape_index;
-            count += 1u;
-        }
-    }
-    return candidate_entities;
-}
-
 // BVH-accelerated raymarching from position
-fn raymarch_from_position_bvh(start_pos: vec3<f32>, ray_origin: vec3<f32>, ray_dir: vec3<f32>, config: RaymarchConfig) -> SceneSdfResult {
+fn raymarch_from_position_bvh(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: RaymarchConfig) -> SceneSdfResult {
     var ray_pos = start_pos;
     var total_distance = 0.0;
 
     // Use BVH to get candidate entities
-    let candidates = bvh_traverse_regarded();//bvh_traverse_for_entities(ray_origin, ray_dir);
-
+    // let candidates = bvh_traverse_regarded();
+    let candidates = bvh_traverse_for_entities(start_pos, ray_dir);
     // Raymarching loop starting from given position with BVH acceleration
     for (var step = 0; step < config.max_steps; step++) {
         // let sdf_result = evaluate_scene_sdf(ray_pos, step);

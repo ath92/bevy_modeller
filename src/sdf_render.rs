@@ -82,7 +82,7 @@ pub struct SDFRenderEntity {
 
 impl Bounded<f32, 3> for SDFRenderEntity {
     fn aabb(&self) -> Aabb<f32, 3> {
-        let half_size = self.scale * 3.; // add .5 for smoothing factor - parameterize this?
+        let half_size = self.scale + 0.5; // add .5 for smoothing factor - parameterize this?
         let half_size_v3 = Vector3::new(half_size, half_size, half_size);
         let pos = Point3::new(self.position.x, self.position.y, self.position.z);
         let min = pos - half_size_v3;
@@ -181,6 +181,7 @@ impl Plugin for SDFRenderPlugin {
                 collect_entity_data,
                 update_camera_settings,
                 update_entity_count_in_settings,
+                update_bvh_node_count_in_settings,
                 update_time_in_settings,
                 build_entity_bvh.after(collect_entity_data),
             ),
@@ -204,6 +205,9 @@ impl Plugin for SDFRenderPlugin {
                     update_render_world_entity_count
                         .in_set(RenderSet::PrepareResources)
                         .after(update_transform_buffer),
+                    update_render_world_bvh_count
+                        .in_set(RenderSet::PrepareResources)
+                        .after(update_bvh_buffer),
                 ),
             )
             .add_systems(
@@ -284,6 +288,33 @@ fn collect_entity_data(
         .collect();
     // Send the data to the render world
     commands.insert_resource(EntityData(transforms));
+}
+
+// System to update BVH node count in render world settings
+fn update_render_world_bvh_count(
+    mut settings_query: Query<&mut SDFRenderSettings>,
+    bvh_buffer: Option<Res<BVHBuffer>>,
+) {
+    for mut settings in settings_query.iter_mut() {
+        let num_bvh_nodes = bvh_buffer
+            .as_ref()
+            .map(|buffer| buffer.data.len())
+            .unwrap_or(0) as u32;
+
+        settings.num_bvh_nodes = num_bvh_nodes;
+    }
+}
+
+// System to update BVH node count in main world settings
+fn update_bvh_node_count_in_settings(
+    mut settings_query: Query<&mut SDFRenderSettings>,
+    bvh_data: Option<Res<FlattenedBVH>>,
+) {
+    for mut settings in settings_query.iter_mut() {
+        let num_bvh_nodes = bvh_data.as_ref().map(|data| data.0.len()).unwrap_or(0) as u32;
+
+        settings.num_bvh_nodes = num_bvh_nodes;
+    }
 }
 
 fn gpu_friendly_f32(f: f32) -> f32 {
@@ -1005,6 +1036,7 @@ pub struct SDFRenderSettings {
     pub projection_matrix: Mat4,
     pub camera_position: Vec3,
     pub entity_count: u32,
+    pub num_bvh_nodes: u32,
     pub inverse_view_projection: Mat4,
     pub time: f32,
     pub coarse_resolution_factor: f32,
@@ -1021,6 +1053,7 @@ impl Default for SDFRenderSettings {
             projection_matrix: Mat4::IDENTITY,
             camera_position: Vec3::ZERO,
             entity_count: 0,
+            num_bvh_nodes: 0,
             inverse_view_projection: Mat4::IDENTITY,
             time: 0.0,
             coarse_resolution_factor: 0.0625, // 1/16 resolution

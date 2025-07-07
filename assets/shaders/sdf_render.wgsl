@@ -31,19 +31,16 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let ray_dir = get_ray_direction(uv, get_inverse_view_projection());
 
     // Start raymarching from coarse distance
-    let start_pos = ray_origin + ray_dir * (coarse_distance * 0.8);
+    let start_pos = ray_origin + ray_dir * (coarse_distance);
 
     // Perform fine raymarching starting from the coarse position with BVH acceleration
-    let result = raymarch_from_position_bvh(start_pos, ray_origin, ray_dir, config);
-    // let result = raymarch_from_position(start_pos, ray_dir, config);
-
-    let total_dist = result.distance + length(result.position - start_pos);
+    let result = raymarch_from_position_bvh(start_pos, ray_dir, config);
 
     if (result.distance < config.max_distance) {
         // Simple lighting calculation using surface normal
         let normal = calculate_normal(result.position);
         let light_dir = normalize(vec3<f32>(1.0, 1.0, 1.0));
-        let diffuse = max(dot(normal, light_dir), 0.1) * ( total_dist / 50.);
+        let diffuse = max(dot(normal, light_dir), 0.1);
 
         return vec4<f32>(diffuse, diffuse, diffuse, 1.0);
     }
