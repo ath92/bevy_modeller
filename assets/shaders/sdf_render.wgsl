@@ -1,5 +1,5 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
-#import "shaders/sdf_common.wgsl"::{PostProcessSettings, SceneSdfResult, RaymarchConfig, default_raymarch_config, calculate_normal, raymarch, get_camera_position, get_ray_direction, get_inverse_view_projection, raymarch_from_position, raymarch_from_position_bvh}
+#import "shaders/sdf_common.wgsl"::{PostProcessSettings, SceneSdfResult, RaymarchConfig, default_raymarch_config, raymarch, get_camera_position, get_ray_direction, get_inverse_view_projection, raymarch_from_position, raymarch_from_position_bvh}
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
 @group(0) @binding(1) var texture_sampler: sampler;
@@ -37,8 +37,8 @@ fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let result = raymarch_from_position_bvh(start_pos, ray_dir, config);
 
     if (result.distance < config.max_distance) {
-        // Simple lighting calculation using surface normal
-        let normal = calculate_normal(result.position);
+        // Simple lighting calculation using surface normal from raymarch result
+        let normal = result.normal;
         let light_dir = normalize(vec3<f32>(1.0, 1.0, 1.0));
         let diffuse = max(dot(normal, light_dir), 0.1);
 

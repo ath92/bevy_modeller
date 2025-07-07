@@ -22,6 +22,7 @@ struct SceneSdfResult {
     distance: f32,
     position: vec3<f32>,
     steps: i32,
+    normal: vec3<f32>,
 }
 
 // Settings structure (must match Rust side)
@@ -64,6 +65,7 @@ fn init_scene_sdf_result(point: vec3<f32>, steps: i32) -> SceneSdfResult {
     result.distance = 999999.0; // Large initial distance
     result.position = point;
     result.steps = steps;
+    result.normal = vec3<f32>(0.0, 0.0, 0.0);
     return result;
 }
 
@@ -111,6 +113,20 @@ fn calculate_normal(point: vec3<f32>) -> vec3<f32> {
         evaluate_scene_sdf(point - vec3<f32>(0.0, epsilon, 0.0), 0).distance,
         evaluate_scene_sdf(point + vec3<f32>(0.0, 0.0, epsilon), 0).distance -
         evaluate_scene_sdf(point - vec3<f32>(0.0, 0.0, epsilon), 0).distance
+    );
+    return normalize(normal);
+}
+
+// Calculate surface normal using finite differences with BVH acceleration
+fn calculate_normal_bvh(point: vec3<f32>, candidates: ptr<function, array<u32, 32>>) -> vec3<f32> {
+    let epsilon = 0.001;
+    let normal = vec3<f32>(
+        evaluate_scene_sdf_with_bvh(point + vec3<f32>(epsilon, 0.0, 0.0), candidates, 0).distance -
+        evaluate_scene_sdf_with_bvh(point - vec3<f32>(epsilon, 0.0, 0.0), candidates, 0).distance,
+        evaluate_scene_sdf_with_bvh(point + vec3<f32>(0.0, epsilon, 0.0), candidates, 0).distance -
+        evaluate_scene_sdf_with_bvh(point - vec3<f32>(0.0, epsilon, 0.0), candidates, 0).distance,
+        evaluate_scene_sdf_with_bvh(point + vec3<f32>(0.0, 0.0, epsilon), candidates, 0).distance -
+        evaluate_scene_sdf_with_bvh(point - vec3<f32>(0.0, 0.0, epsilon), candidates, 0).distance
     );
     return normalize(normal);
 }
@@ -177,10 +193,10 @@ fn ray_aabb_intersect(ray_origin: vec3<f32>, ray_dir: vec3<f32>, aabb_min: vec3<
 }
 
 // Linear BVH traversal following the reference implementation
-fn bvh_traverse_for_entities(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> array<u32, 64> {
-    var candidate_entities: array<u32, 64>;
+fn bvh_traverse_for_entities(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> array<u32, 32> {
+    var candidate_entities: array<u32, 32>;
     // Initialize array with invalid indices
-    for (var i = 0u; i < 64u; i++) {
+    for (var i = 0u; i < 32u; i++) {
         candidate_entities[i] = 0xFFFFFFFFu;
     }
     var candidate_count = 0u;
@@ -189,7 +205,7 @@ fn bvh_traverse_for_entities(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> array
     let max_length = sdf_settings.num_bvh_nodes;
 
     // Iterate while the node index is valid
-    while (index < max_length && candidate_count < 64u) {
+    while (index < max_length && candidate_count < 32u) {
         let node = bvh_nodes[index];
         let shape_index = node.shape_index;
 
@@ -237,13 +253,13 @@ fn combine_sphere_into_scene_result(
 }
 
 // Evaluate SDF at a specific point using BVH acceleration
-fn evaluate_scene_sdf_with_bvh(point: vec3<f32>, candidates: array<u32, 64>, steps: i32) -> SceneSdfResult {
+fn evaluate_scene_sdf_with_bvh(point: vec3<f32>, candidates: ptr<function, array<u32, 32>>, steps: i32) -> SceneSdfResult {
     var result = init_scene_sdf_result(point, steps);
     let smoothing_factor = 0.5; // Adjust for more/less blending
 
     var processed_any = false;
-    for (var i = 0u; i < 64u; i++) {
-        let entity_index = candidates[i];
+    for (var i = 0u; i < 32u; i++) {
+        let entity_index = (*candidates)[i];
         // Check if we have a valid entity index
         if (entity_index >= sdf_settings.entity_count) {
             continue;
@@ -307,7 +323,10 @@ fn raymarch(uv: vec2<f32>, ray_origin: vec3<f32>, config: RaymarchConfig) -> Sce
 
         // If we're close enough to a surface, we've hit something
         if (sdf_result.distance < config.surface_threshold) {
-            return sdf_result;
+            // Calculate normal at the surface point
+            var result = sdf_result;
+            result.normal = calculate_normal(ray_pos);
+            return result;
         }
 
         // If we've traveled too far, we haven't hit anything
@@ -323,6 +342,7 @@ fn raymarch(uv: vec2<f32>, ray_origin: vec3<f32>, config: RaymarchConfig) -> Sce
     var result: SceneSdfResult;
     result.distance = total_distance;
     result.position = ray_pos;
+    result.normal = vec3<f32>(0.0, 0.0, 0.0);
     return result;
 }
 
@@ -336,7 +356,10 @@ fn raymarch_from_position(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: Raym
 
         // If we're close enough to a surface, we've hit something
         if (sdf_result.distance < config.surface_threshold) {
-            return sdf_result;
+            // Calculate normal at the surface point
+            var result = sdf_result;
+            result.normal = calculate_normal(ray_pos);
+            return result;
         }
 
         // If we've traveled too far, we haven't hit anything
@@ -352,6 +375,7 @@ fn raymarch_from_position(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: Raym
     var result: SceneSdfResult;
     result.distance = config.max_distance;
     result.position = ray_pos;
+    result.normal = vec3<f32>(0.0, 0.0, 0.0);
     return result;
 }
 
@@ -362,15 +386,18 @@ fn raymarch_from_position_bvh(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: 
 
     // Use BVH to get candidate entities
     // let candidates = bvh_traverse_regarded();
-    let candidates = bvh_traverse_for_entities(start_pos, ray_dir);
+    var candidates = bvh_traverse_for_entities(start_pos, ray_dir);
     // Raymarching loop starting from given position with BVH acceleration
     for (var step = 0; step < config.max_steps; step++) {
         // let sdf_result = evaluate_scene_sdf(ray_pos, step);
-        let sdf_result = evaluate_scene_sdf_with_bvh(ray_pos, candidates, step);
+        let sdf_result = evaluate_scene_sdf_with_bvh(ray_pos, &candidates, step);
 
         // If we're close enough to a surface, we've hit something
         if (sdf_result.distance < config.surface_threshold) {
-            return sdf_result;
+            // Calculate normal using the same candidate list for consistency
+            var result = sdf_result;
+            result.normal = calculate_normal_bvh(ray_pos, &candidates);
+            return result;
         }
 
         // If we've traveled too far, we haven't hit anything
@@ -386,5 +413,6 @@ fn raymarch_from_position_bvh(start_pos: vec3<f32>, ray_dir: vec3<f32>, config: 
     var result: SceneSdfResult;
     result.distance = config.max_distance;
     result.position = ray_pos;
+    result.normal = vec3<f32>(0.0, 0.0, 0.0);
     return result;
 }
