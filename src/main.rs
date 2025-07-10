@@ -97,7 +97,13 @@ fn setup_system(mut commands: Commands) {
         },
         DepthPrepass,
         Msaa::Off,
-        PanOrbitCamera::default(),
+        PanOrbitCamera {
+            button_orbit: MouseButton::Right,
+            button_pan: MouseButton::Left,
+            modifier_orbit: None,
+            modifier_pan: Some(KeyCode::SuperLeft),
+            ..default()
+        },
         Transform::from_xyz(0., 2.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
@@ -112,26 +118,26 @@ fn setup_system(mut commands: Commands) {
         Transform::from_xyz(8.0, 16.0, 8.0),
     ));
 
-    let mut rng = rand::rng();
-    for i in 0..100 {
-        info!("spanw {:?}", i);
-        spawn_sphere_at_pos(
-            Vec3::new(
-                rng.random_range(-2.0..2.0),
-                rng.random_range(-2.0..2.0),
-                rng.random_range(-2.0..2.0),
-            ),
-            0.2,
-        );
-    }
-    // spawn_sphere_at_pos(
-    //     Vec3 {
-    //         x: 0.,
-    //         y: 0.,
-    //         z: 0.,
-    //     },
-    //     1.,
-    // );
+    // let mut rng = rand::rng();
+    // for i in 0..100 {
+    //     info!("spanw {:?}", i);
+    //     spawn_sphere_at_pos(
+    //         Vec3::new(
+    //             rng.random_range(-2.0..2.0),
+    //             rng.random_range(-2.0..2.0),
+    //             rng.random_range(-2.0..2.0),
+    //         ),
+    //         0.2,
+    //     );
+    // }
+    spawn_sphere_at_pos(
+        Vec3 {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        },
+        1.,
+    );
 
     commands.spawn(PerfUiDefaultEntries::default());
 }
