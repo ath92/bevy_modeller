@@ -345,8 +345,6 @@ fn build_entity_bvh(mut commands: Commands, entity_data: ResMut<EntityData>) {
         })
         .collect();
 
-    info!("{:?} sdf entities", sdf_entities);
-
     let bvh = Bvh::build_par(&mut sdf_entities);
 
     let flat = bvh.flatten();
@@ -373,7 +371,6 @@ fn build_entity_bvh(mut commands: Commands, entity_data: ResMut<EntityData>) {
         })
         .collect();
 
-    info!("BVH NODESSSSSSSSS {:?}", as_bvh_nodes);
     commands.insert_resource(FlattenedBVH(as_bvh_nodes));
 }
 
@@ -391,20 +388,6 @@ fn update_bvh_buffer(
 
     bvh_buffer.data = bvh_data.clone();
     let byte_size = bvh_buffer.data.len() * std::mem::size_of::<BVHNode>();
-
-    // Debug: Log first few BVH nodes
-    for (i, node) in bvh_data.iter().take(50).enumerate() {
-        info!(
-            "BVH Node {}: type={}, entry={}, exit={}, shape={}, aabb=({:.2},{:.2},{:.2})-({:.2},{:.2},{:.2})",
-            i,
-            if node.shape_index != u32::MAX { "leaf" } else { "internal" },
-            node.entry_index,
-            node.exit_index,
-            node.shape_index,
-            node.min.x, node.min.y, node.min.z,
-            node.max.x, node.max.y, node.max.z
-        );
-    }
 
     // Create or recreate buffer if needed
     if bvh_buffer.buffer.is_none() || bvh_buffer.capacity < byte_size {
@@ -425,7 +408,6 @@ fn update_bvh_buffer(
     if let Some(buffer) = &bvh_buffer.buffer {
         if !bvh_buffer.data.is_empty() {
             render_queue.write_buffer(buffer, 0, bytemuck::cast_slice(&bvh_buffer.data));
-            info!("Updated BVH buffer with {} BVHnodes", bvh_buffer.data.len());
         }
     }
 }
@@ -730,6 +712,7 @@ impl ViewNode for SDFCoarsePrepassNode {
         let coarse_pipeline = world.resource::<SDFCoarsePrepassPipeline>();
         let transform_buffer = world.resource::<EntityBuffer>();
         let pipeline_cache = world.resource::<PipelineCache>();
+        let bvh_buffer = world.resource::<BVHBuffer>();
 
         let Some(pipeline) = pipeline_cache.get_render_pipeline(coarse_pipeline.pipeline_id) else {
             return Ok(());
@@ -750,6 +733,13 @@ impl ViewNode for SDFCoarsePrepassNode {
             .map(|b| b.as_entire_binding())
         else {
             return Ok(());
+        };
+
+        let bvh_buffer_binding = bvh_buffer.buffer.as_ref().map(|b| b.as_entire_binding());
+
+        let Some(bvh_binding) = bvh_buffer_binding else {
+            info!("no bvh binding");
+            return Ok(()); // Skip rendering if no BVH buffer
         };
 
         let Some(coarse_texture) = world.get_resource::<CoarsePassTexture>() else {
@@ -789,7 +779,11 @@ impl ViewNode for SDFCoarsePrepassNode {
         let sdf_bind_group = render_context.render_device().create_bind_group(
             "sdf_coarse_scene_bind_group",
             &coarse_pipeline.sdf_layout,
-            &BindGroupEntries::sequential((settings_binding.clone(), transform_binding)),
+            &BindGroupEntries::sequential((
+                settings_binding.clone(),
+                transform_binding,
+                bvh_binding,
+            )),
         );
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
@@ -983,6 +977,17 @@ impl FromWorld for SDFCoarsePrepassPipeline {
                         },
                         count: None,
                     },
+                    // BVH Buffer
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ),
             ),
         );
@@ -1057,8 +1062,8 @@ impl Default for SDFRenderSettings {
             inverse_view_projection: Mat4::IDENTITY,
             time: 0.0,
             coarse_resolution_factor: 0.0625, // 1/16 resolution
-            coarse_distance_multiplier: 16.0, // 25x higher threshold
-            coarse_max_steps: 16,             // Reduced steps for performance
+            coarse_distance_multiplier: 10.,  // 10x higher threshold
+            coarse_max_steps: 24,             // Reduced steps for performance
         }
     }
 }
