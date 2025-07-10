@@ -10,7 +10,9 @@ use bevy::{
     render::{
         extract_component::ComponentUniforms,
         render_graph::{self, RenderGraphApp, RenderLabel},
-        render_resource::{binding_types::*, *},
+        render_resource::{
+            binding_types::*, BindGroupLayoutEntry, BindingType, BufferBindingType, ShaderStages, *,
+        },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         Render, RenderApp, RenderSet,
     },
@@ -156,6 +158,7 @@ fn prepare_sdf_bind_groups(
     render_device: Res<RenderDevice>,
     buffers: Res<SdfComputeBuffers>,
     entity_buffer: Res<crate::sdf_render::EntityBuffer>,
+    bvh_buffer: Res<crate::sdf_render::BVHBuffer>,
     settings_uniforms: Res<ComponentUniforms<crate::sdf_render::SDFRenderSettings>>,
 ) {
     // Bind group 0: compute-specific resources (query points and results)
@@ -171,19 +174,23 @@ fn prepare_sdf_bind_groups(
     // Bind group 1: shared SDF scene data (from post_process module)
     // Use the actual settings uniform from the post_process module
     if let Some(settings_binding) = settings_uniforms.uniforms().binding() {
-        let sdf_bind_group = render_device.create_bind_group(
-            Some("sdf_scene_bind_group"),
-            &pipeline.sdf_layout,
-            &BindGroupEntries::sequential((
-                settings_binding,
-                entity_buffer.buffer.as_ref().unwrap().as_entire_binding(),
-            )),
-        );
+        if let Some(bvh_buffer_binding) = bvh_buffer.buffer.as_ref().map(|b| b.as_entire_binding())
+        {
+            let sdf_bind_group = render_device.create_bind_group(
+                Some("sdf_scene_bind_group"),
+                &pipeline.sdf_layout,
+                &BindGroupEntries::sequential((
+                    settings_binding,
+                    entity_buffer.buffer.as_ref().unwrap().as_entire_binding(),
+                    bvh_buffer_binding,
+                )),
+            );
 
-        commands.insert_resource(SdfComputeBindGroups {
-            compute_bind_group,
-            sdf_bind_group,
-        });
+            commands.insert_resource(SdfComputeBindGroups {
+                compute_bind_group,
+                sdf_bind_group,
+            });
+        }
     }
 }
 
@@ -222,6 +229,17 @@ impl FromWorld for SdfComputePipeline {
                     uniform_buffer::<crate::sdf_render::SDFRenderSettings>(true),
                     // Entity transforms storage buffer
                     storage_buffer_read_only::<Mat4>(false),
+                    // BVH nodes storage buffer
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
                 ),
             ),
         );
