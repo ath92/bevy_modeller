@@ -9,7 +9,7 @@ pub enum AppMode {
 
 impl Default for AppMode {
     fn default() -> Self {
-        AppMode::Translate
+        AppMode::Brush
     }
 }
 
@@ -25,7 +25,7 @@ impl Default for AppModeState {
         selection_enabled_modes.insert(AppMode::Translate);
 
         Self {
-            current_mode: AppMode::Translate,
+            current_mode: AppMode::Brush,
             selection_enabled_modes,
         }
     }
