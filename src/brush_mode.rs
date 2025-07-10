@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::tasks::Task;
 use bevy::window::PrimaryWindow;
 
 use crate::command_bridge::spawn_sphere_at_pos;
@@ -8,9 +9,21 @@ use crate::sdf_compute::{evaluate_sdf_async, SdfEvaluationSender};
 
 pub struct BrushModePlugin;
 
+#[derive(Resource)]
+pub struct BrushTask {
+    pub task: Option<Task<()>>,
+}
+
+impl Default for BrushTask {
+    fn default() -> Self {
+        Self { task: None }
+    }
+}
+
 impl Plugin for BrushModePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, handle_click_brush);
+        app.init_resource::<BrushTask>()
+            .add_systems(Update, handle_click_brush);
     }
 }
 
@@ -21,11 +34,19 @@ fn handle_click_brush(
     buttons: Res<ButtonInput<MouseButton>>,
     sdf_sender: Res<SdfEvaluationSender>,
     camera_query: Query<(&Camera, &GlobalTransform, &OverlayCamera)>,
+    mut brush_task: ResMut<BrushTask>,
 ) {
     if !mode_state.is_mode(AppMode::Brush) {
         return;
     }
-    if buttons.just_pressed(MouseButton::Left) {
+
+    if let Some(task) = &brush_task.task {
+        if !task.is_finished() {
+            return;
+        }
+    }
+
+    if buttons.pressed(MouseButton::Left) {
         info!("drag paint");
         let Some(viewport_position) = window.cursor_position() else {
             return;
@@ -51,18 +72,19 @@ fn handle_click_brush(
         let sender_clone = sdf_sender.clone();
 
         // Spawn the future and handle results when ready
-        bevy::tasks::AsyncComputeTaskPool::get()
-            .spawn(async move {
-                let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await else {
-                    return;
-                };
-                for (_, result) in results.iter().enumerate() {
-                    let new_sphere_radius = 0.1;
-                    let pos = ray.get_point(result.distance - new_sphere_radius);
+        // Spawn the future and store the task
+        let task = bevy::tasks::AsyncComputeTaskPool::get().spawn(async move {
+            let Ok(results) = evaluate_sdf_async(gpu_points, &sender_clone).await else {
+                return;
+            };
+            for (_, result) in results.iter().enumerate() {
+                let new_sphere_radius = 0.1;
+                let pos = ray.get_point(result.distance - new_sphere_radius);
 
-                    spawn_sphere_at_pos(pos, new_sphere_radius);
-                }
-            })
-            .detach();
+                spawn_sphere_at_pos(pos, new_sphere_radius);
+            }
+        });
+
+        brush_task.task = Some(task);
     }
 }
